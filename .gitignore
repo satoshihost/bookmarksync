@@ -1,0 +1,31 @@
+# Go
+server/bookmarksync
+server/data/
+*.exe
+*.dll
+*.so
+*.dylib
+go.sum
+
+# Extension build artifacts
+extension/dist/
+extension/node_modules/
+extension/package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

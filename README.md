@@ -90,6 +90,49 @@ sync.yourdomain.com {
 
 That's it! Caddy handles Let's Encrypt automatically.
 
+### Running at Home (Behind Router/NAT)
+
+No static IP? No problem! Modern solutions make home servers practical:
+
+**Option 1: Cloudflare Tunnel (Recommended)**
+```bash
+# Install cloudflared
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+chmod +x cloudflared
+
+# Start tunnel (generates a free .trycloudflare.com subdomain)
+./cloudflared tunnel --url http://localhost:8080
+```
+No port forwarding, no dynamic DNS, works behind any router.
+
+**Option 2: Tailscale (Private Network)**
+- Install [Tailscale](https://tailscale.com/) on your server and devices
+- Access via private IP (e.g., `http://100.x.x.x:8080`)
+- Perfect for personal/family use
+- No public internet exposure
+
+**Option 3: Dynamic DNS**
+- Use services like [DuckDNS](https://www.duckdns.org/) or [No-IP](https://www.noip.com/)
+- Configure router for port forwarding (80, 443)
+- Update DNS when IP changes (usually via cron script)
+
+**Option 4: Local Network Only**
+- No setup needed - just run the server
+- Access via `http://192.168.x.x:8080` on same network
+- Perfect for offline sync or maximum privacy
+
+**Hardware Ideas:**
+- **Raspberry Pi 4** (2GB+ RAM) — ~$50, silent, low power
+- **Old laptop** — repurpose unused hardware
+- **NAS** (Synology, QNAP) — many support containers or Go binaries
+- **Mini PC** — Intel NUC, Beelink, etc.
+
+**Pre-built Binaries Coming Soon:**
+- Windows `.exe` (portable, no install needed)
+- macOS universal binary
+- Linux `.deb` and `.rpm` packages
+- Docker image for one-command deployment
+
 ---
 
 ## API Documentation
@@ -152,6 +195,11 @@ bookmarksync/
   - [ ] Crypto module
 - [ ] Chrome Web Store submission
 - [ ] Firefox Add-ons submission
+- [ ] Easy deployment options
+  - [ ] Pre-built binaries (Windows, macOS, Linux)
+  - [ ] Docker image
+  - [ ] Debian/Ubuntu packages (.deb)
+  - [ ] Home server guide (Cloudflare Tunnel, Tailscale, etc.)
 - [ ] Mobile app (future consideration)
 
 ---

@@ -231,9 +231,13 @@ async function resetSettings() {
 
 async function restoreBookmarks(bookmarkTree) {
     try {
+        console.log('Starting bookmark restore...');
+        console.log('Backup data:', bookmarkTree);
+        
         // Get the root bookmark folders
         const tree = await chrome.bookmarks.getTree();
         const root = tree[0];
+        console.log('Current browser root:', root);
         
         // Delete all existing bookmarks (except root structure)
         for (const child of root.children) {
@@ -250,15 +254,19 @@ async function restoreBookmarks(bookmarkTree) {
         const backupRoot = bookmarkTree[0];
         
         if (backupRoot && backupRoot.children) {
+            console.log('Processing', backupRoot.children.length, 'top-level folders');
             for (const sourceFolder of backupRoot.children) {
+                console.log('Processing folder:', sourceFolder.title);
                 // Find matching folder in current browser by title
                 // Common names: "Bookmarks Bar", "Bookmarks bar", "Other Bookmarks", "Other bookmarks", "Mobile Bookmarks"
                 const targetFolder = root.children.find(c => 
                     c.title.toLowerCase() === sourceFolder.title.toLowerCase()
                 );
+                console.log('Target folder found:', targetFolder?.title || 'NONE');
                 
                 if (targetFolder && sourceFolder.children) {
                     // Merge into existing top-level folder
+                    console.log('Merging', sourceFolder.children.length, 'items into', targetFolder.title);
                     for (const child of sourceFolder.children) {
                         await restoreNode(child, targetFolder.id);
                     }

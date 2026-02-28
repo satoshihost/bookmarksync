@@ -1,34 +1,39 @@
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const targetTab = tab.dataset.tab;
-        
-        // Update tab buttons
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(targetTab).classList.add('active');
-    });
-});
-
-// Local file sync handlers
-document.getElementById('exportBtn')?.addEventListener('click', exportBookmarks);
-document.getElementById('importBtn')?.addEventListener('click', importBookmarks);
-
-// Server sync handlers
-document.getElementById('generateIdBtn').addEventListener('click', generateSyncId);
-document.getElementById('saveServerBtn').addEventListener('click', saveServerSettings);
-document.getElementById('syncNowBtn').addEventListener('click', syncNow);
-
-// Settings handlers
-document.getElementById('resetBtn').addEventListener('click', resetSettings);
-
 // Initialize on load
-document.addEventListener('DOMContentLoaded', initializePopup);
+document.addEventListener('DOMContentLoaded', () => {
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(targetTab).classList.add('active');
+        });
+    });
+
+    // Local file sync handlers
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    if (exportBtn) exportBtn.addEventListener('click', exportBookmarks);
+    if (importBtn) importBtn.addEventListener('click', importBookmarks);
+
+    // Server sync handlers
+    document.getElementById('generateIdBtn').addEventListener('click', generateSyncId);
+    document.getElementById('saveServerBtn').addEventListener('click', saveServerSettings);
+    document.getElementById('syncNowBtn').addEventListener('click', syncNow);
+
+    // Settings handlers
+    document.getElementById('resetBtn').addEventListener('click', resetSettings);
+    
+    // Initialize popup
+    initializePopup();
+});
 
 async function initializePopup() {
     // Load saved settings

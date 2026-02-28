@@ -245,8 +245,30 @@ async function restoreBookmarks(bookmarkTree) {
         const backupRoot = bookmarkTree[0];
         
         if (backupRoot && backupRoot.children) {
-            for (const folder of backupRoot.children) {
-                await restoreNode(folder, root.children.find(c => c.title === folder.title)?.id || '1');
+            for (const sourceFolder of backupRoot.children) {
+                // Find matching folder in current browser by title
+                // Common names: "Bookmarks Bar", "Bookmarks bar", "Other Bookmarks", "Other bookmarks", "Mobile Bookmarks"
+                const targetFolder = root.children.find(c => 
+                    c.title.toLowerCase() === sourceFolder.title.toLowerCase()
+                );
+                
+                if (targetFolder && sourceFolder.children) {
+                    // Merge into existing top-level folder
+                    for (const child of sourceFolder.children) {
+                        await restoreNode(child, targetFolder.id);
+                    }
+                } else if (!targetFolder) {
+                    // Folder doesn't exist in target, create it
+                    const newFolder = await chrome.bookmarks.create({
+                        parentId: root.id,
+                        title: sourceFolder.title
+                    });
+                    if (sourceFolder.children) {
+                        for (const child of sourceFolder.children) {
+                            await restoreNode(child, newFolder.id);
+                        }
+                    }
+                }
             }
         }
         

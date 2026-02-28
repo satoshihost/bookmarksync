@@ -131,9 +131,46 @@ async function exportBookmarks() {
 }
 
 async function importBookmarks() {
-    // TODO: Implement file picker and import
-    // Note: File System Access API requires user interaction
-    showNotification('Import feature coming soon!', 'info');
+    try {
+        // Create file input element
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        
+        input.onchange = async (e) => {
+            try {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                // Validate format
+                if (!data.version || !data.bookmarks) {
+                    showNotification('Invalid bookmark file format', 'error');
+                    return;
+                }
+                
+                // Warn user about replacement
+                if (!confirm('This will REPLACE all your current bookmarks. Make sure you have a backup!\n\nContinue?')) {
+                    return;
+                }
+                
+                // TODO: Implement actual bookmark restoration
+                // For now, just show success
+                showNotification('Import functionality coming soon! File is valid.', 'info');
+                
+            } catch (error) {
+                showNotification('Import failed: ' + error.message, 'error');
+            }
+        };
+        
+        // Trigger file picker
+        input.click();
+        
+    } catch (error) {
+        showNotification('Import failed: ' + error.message, 'error');
+    }
 }
 
 function generateSyncId() {

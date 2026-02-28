@@ -16,8 +16,8 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // Local file sync handlers
-document.getElementById('exportBtn').addEventListener('click', exportBookmarks);
-document.getElementById('importBtn').addEventListener('click', importBookmarks);
+document.getElementById('exportBtn')?.addEventListener('click', exportBookmarks);
+document.getElementById('importBtn')?.addEventListener('click', importBookmarks);
 
 // Server sync handlers
 document.getElementById('generateIdBtn').addEventListener('click', generateSyncId);

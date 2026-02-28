@@ -29,3 +29,4 @@ Thumbs.db
 # Environment
 .env
 .env.local
+browser-sync-icon*.png

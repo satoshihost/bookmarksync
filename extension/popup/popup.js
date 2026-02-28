@@ -240,11 +240,18 @@ async function restoreBookmarks(bookmarkTree) {
         console.log('Current browser root:', root);
         
         // Delete all existing bookmarks (except root structure)
+        console.log('Clearing existing bookmarks...');
         for (const child of root.children) {
             // Keep the root folders but delete their contents
-            if (child.children) {
-                for (const bookmark of child.children) {
-                    await chrome.bookmarks.removeTree(bookmark.id);
+            if (child.children && child.children.length > 0) {
+                console.log('Clearing folder:', child.title, '(', child.children.length, 'items)');
+                // Delete children in reverse to avoid index issues
+                for (let i = child.children.length - 1; i >= 0; i--) {
+                    try {
+                        await chrome.bookmarks.removeTree(child.children[i].id);
+                    } catch (e) {
+                        console.warn('Could not delete bookmark:', e);
+                    }
                 }
             }
         }

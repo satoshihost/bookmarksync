@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "BookmarkSync",
+  "version": "1.0.0",
+  "description": "Privacy-first bookmark synchronization. No account, end-to-end encrypted.",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "alarms",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://sync.satoshihost.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

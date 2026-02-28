@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookmarkSync</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 BookmarkSync</h1>
+            <p class="tagline">Privacy-first bookmark sync</p>
+        </header>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-indicator" id="statusIndicator">●</span>
+            <span id="statusText">Not configured</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="local">Local</button>
+            <button class="tab" data-tab="server">Server</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </div>
+
+        <div class="tab-content active" id="local">
+            <h2>Local File Sync</h2>
+            <p class="help-text">Export and import bookmarks as a JSON file on your computer. No server needed.</p>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" id="exportBtn">
+                    📥 Export Bookmarks
+                </button>
+                <button class="btn btn-primary" id="importBtn">
+                    📤 Import Bookmarks
+                </button>
+            </div>
+
+            <div class="info-box">
+                <strong>💡 Use case:</strong> Manual sync via USB, Dropbox, Syncthing, etc.
+            </div>
+        </div>
+
+        <div class="tab-content" id="server">
+            <h2>Server Sync</h2>
+            <p class="help-text">Automatically sync across devices using an encrypted server.</p>
+
+            <div class="form-group">
+                <label for="serverUrl">Server URL</label>
+                <input type="text" id="serverUrl" placeholder="https://sync.satoshihost.com" value="https://sync.satoshihost.com">
+            </div>
+
+            <div class="form-group">
+                <label for="syncId">Sync ID</label>
+                <div class="input-with-btn">
+                    <input type="text" id="syncId" placeholder="Generate or enter your sync ID">
+                    <button class="btn btn-small" id="generateIdBtn">Generate</button>
+                </div>
+                <span class="help-text">Share this ID across your devices</span>
+            </div>
+
+            <div class="form-group">
+                <label for="passphrase">Passphrase</label>
+                <input type="password" id="passphrase" placeholder="Your encryption passphrase">
+                <span class="help-text">Never sent to server • Used for encryption only</span>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="autoSync">
+                    Enable automatic sync
+                </label>
+                <span class="help-text">Sync every 30 minutes</span>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="saveServerBtn">Save Settings</button>
+                <button class="btn btn-secondary" id="syncNowBtn">Sync Now</button>
+            </div>
+        </div>
+
+        <div class="tab-content" id="settings">
+            <h2>Settings</h2>
+            
+            <div class="form-group">
+                <label for="syncInterval">Sync Interval (minutes)</label>
+                <input type="number" id="syncInterval" min="5" max="1440" value="30">
+            </div>
+
+            <div class="stats">
+                <h3>Statistics</h3>
+                <div class="stat-item">
+                    <span>Total bookmarks:</span>
+                    <strong id="totalBookmarks">—</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Last sync:</span>
+                    <strong id="lastSync">Never</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Sync mode:</span>
+                    <strong id="syncMode">None</strong>
+                </div>
+            </div>
+
+            <div class="danger-zone">
+                <h3>Danger Zone</h3>
+                <button class="btn btn-danger" id="resetBtn">Reset All Settings</button>
+            </div>
+        </div>
+
+        <footer>
+            <a href="https://github.com/satoshihost/bookmarksync" target="_blank">About</a> •
+            <a href="https://sync.satoshihost.com" target="_blank">Server Status</a>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

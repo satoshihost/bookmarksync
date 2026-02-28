@@ -17,12 +17,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Local file sync handlers
-    const exportBtn = document.getElementById('exportBtn');
-    const importBtn = document.getElementById('importBtn');
-    if (exportBtn) exportBtn.addEventListener('click', exportBookmarks);
-    if (importBtn) importBtn.addEventListener('click', importBookmarks);
-
     // Server sync handlers
     document.getElementById('generateIdBtn').addEventListener('click', generateSyncId);
     document.getElementById('saveServerBtn').addEventListener('click', saveServerSettings);

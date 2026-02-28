@@ -156,9 +156,9 @@ async function importBookmarks() {
                     return;
                 }
                 
-                // TODO: Implement actual bookmark restoration
-                // For now, just show success
-                showNotification('Import functionality coming soon! File is valid.', 'info');
+                // Restore bookmarks
+                await restoreBookmarks(data.bookmarks);
+                showNotification('Bookmarks imported successfully!');
                 
             } catch (error) {
                 showNotification('Import failed: ' + error.message, 'error');
@@ -221,6 +221,63 @@ async function resetSettings() {
         await chrome.storage.local.clear();
         await chrome.alarms.clearAll();
         location.reload();
+    }
+}
+
+async function restoreBookmarks(bookmarkTree) {
+    try {
+        // Get the root bookmark folders
+        const tree = await chrome.bookmarks.getTree();
+        const root = tree[0];
+        
+        // Delete all existing bookmarks (except root structure)
+        for (const child of root.children) {
+            // Keep the root folders but delete their contents
+            if (child.children) {
+                for (const bookmark of child.children) {
+                    await chrome.bookmarks.removeTree(bookmark.id);
+                }
+            }
+        }
+        
+        // Restore from backup
+        // The backup contains the full tree starting from root
+        const backupRoot = bookmarkTree[0];
+        
+        if (backupRoot && backupRoot.children) {
+            for (const folder of backupRoot.children) {
+                await restoreNode(folder, root.children.find(c => c.title === folder.title)?.id || '1');
+            }
+        }
+        
+    } catch (error) {
+        console.error('Restore failed:', error);
+        throw new Error('Failed to restore bookmarks: ' + error.message);
+    }
+}
+
+async function restoreNode(node, parentId) {
+    // Skip if no parent
+    if (!parentId) return;
+    
+    // Create folder or bookmark
+    const createParams = {
+        parentId: parentId,
+        title: node.title
+    };
+    
+    if (node.url) {
+        // It's a bookmark
+        createParams.url = node.url;
+        await chrome.bookmarks.create(createParams);
+    } else if (node.children) {
+        // It's a folder
+        const newFolder = await chrome.bookmarks.create(createParams);
+        
+        // Recursively restore children
+        for (const child of node.children) {
+            await restoreNode(child, newFolder.id);
+        }
     }
 }
 

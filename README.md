@@ -1,5 +1,9 @@
 # BookmarkSync
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/satoshihost/bookmarksync)
+
+**Live site: [sync.satoshihost.com](https://sync.satoshihost.com/)**
+
 **Privacy-first bookmark synchronization** — simple, secure, self-hostable.
 
 ---

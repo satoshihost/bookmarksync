@@ -30,3 +30,5 @@ convert -size 128x128 -background "#667eea" -fill white \
 convert -resize 48x48 icon-128.png icon-48.png
 convert -resize 16x16 icon-128.png icon-16.png
 ```
+
+minimalist bookmark sync icon, purple gradient (#667eea to #764ba2), flat design

@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookmarkSync</title>
+    <title>Full Browser Sync</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📚 BookmarkSync</h1>
+            <h1>📚 Full Browser Sync</h1>
             <p class="tagline">Privacy-first bookmark sync</p>
         </header>
 
@@ -19,8 +19,37 @@
         </div>
 
         <div class="tabs">
+            <button class="tab" data-tab="local">Local backup</button>
             <button class="tab active" data-tab="server">Sync</button>
             <button class="tab" data-tab="settings">Settings</button>
+        </div>
+
+        <div class="tab-content" id="local">
+            <h2>Local backup</h2>
+            <p class="help-text">Save a bookmark backup to a file, then import that file in another browser. Nothing is uploaded.</p>
+
+            <div class="local-actions">
+                <button class="btn btn-primary" id="exportBookmarksBtn">Export bookmarks</button>
+                <span class="help-text">Your browser will ask where to save the backup file.</span>
+            </div>
+
+            <div class="local-actions">
+                <button class="btn btn-secondary" id="importBookmarksBtn">Import bookmarks</button>
+                <label class="backup-choice">
+                    <input type="checkbox" id="chooseBackupLocation" checked>
+                    Choose where to save the safety backup
+                </label>
+                <span class="help-text">Import replaces your bookmarks. A backup of this browser is saved first.</span>
+            </div>
+
+            <div class="info-box">
+                To transfer bookmarks, export in one browser and import the saved file in the other.
+            </div>
+
+            <div class="local-actions" style="margin-top: 1.25rem; border-top: 1px dashed #ced4da; padding-top: 1rem;">
+                <button class="btn btn-secondary" id="rollbackSafetyBackupBtn" style="display:none; width: 100%; margin-bottom: 0.25rem;">⏪ Restore Auto Safety Backup</button>
+                <span class="help-text" id="rollbackHelpText">No auto safety backup available.</span>
+            </div>
         </div>
 
         <div class="tab-content active" id="server">
@@ -47,17 +76,29 @@
                 <span class="help-text">Never sent to server • Used for encryption only</span>
             </div>
 
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="autoSync">
-                    Enable automatic sync
-                </label>
-                <span class="help-text">Sync every 30 minutes</span>
+            <!-- Shown on first use when server has data but this browser has never synced -->
+            <div id="firstSyncPanel" class="first-sync-panel" style="display:none">
+                <p class="first-sync-heading">Choose how to start syncing on this browser:</p>
+                <button class="btn btn-secondary" id="firstSyncDownloadBtn">
+                    Download from server
+                    <span class="first-sync-sub">Replaces bookmarks in this browser with the server copy</span>
+                </button>
+                <button class="btn btn-primary" id="firstSyncUploadBtn">
+                    Upload mine to server
+                    <span class="first-sync-sub">Overwrites the server copy with this browser's bookmarks</span>
+                </button>
             </div>
 
-            <div class="button-group">
-                <button class="btn btn-primary" id="saveServerBtn">Save Settings</button>
-                <button class="btn btn-secondary" id="syncNowBtn">Sync Now</button>
+            <div class="button-group" id="syncNowGroup">
+                <button class="btn btn-primary" id="syncNowBtn">Sync Now</button>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="btn btn-small btn-secondary" id="forceDownloadBtn" style="flex: 1; font-size: 0.75rem; padding: 4px;">⬇ Force Download</button>
+                    <button class="btn btn-small btn-secondary" id="forceUploadBtn" style="flex: 1; font-size: 0.75rem; padding: 4px;">⬆ Force Upload</button>
+                </div>
+            </div>
+
+            <div class="info-box warning-box">
+                Keep your Sync ID and passphrase somewhere safe — they cannot be recovered, and without them you cannot sync to another browser.
             </div>
         </div>
 
@@ -67,7 +108,8 @@
             
             <div class="form-group">
                 <label for="syncInterval">Sync Interval (minutes)</label>
-                <input type="number" id="syncInterval" min="5" max="1440" value="30">
+                <input type="number" id="syncInterval" min="1" max="1440" value="10">
+                <button class="btn btn-primary" id="saveIntervalBtn">Save</button>
             </div>
 
             <div class="stats">
@@ -86,6 +128,15 @@
                 </div>
             </div>
 
+            <div class="form-group" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                <label style="font-weight: 600;">Debug & Testing</label>
+                <label class="backup-choice" style="margin-top: 8px;">
+                    <input type="checkbox" id="plaintextMode">
+                    Plaintext Mode (Disable Encryption for Testing)
+                </label>
+                <span class="help-text">Stores raw bookmark JSON on server so files in /opt/bookmarksync/data/ can be inspected directly.</span>
+            </div>
+
             <div class="danger-zone">
                 <h3>Danger Zone</h3>
                 <button class="btn btn-danger" id="resetBtn">Reset All Settings</button>
@@ -98,6 +149,10 @@
         </footer>
     </div>
 
+    <script src="../config.local.js"></script>
+    <script src="../lib/crypto.js"></script>
+    <script src="../lib/sync.js"></script>
+    <script src="../lib/bookmarks.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

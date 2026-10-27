@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "BookmarkSync",
-  "version": "1.0.0",
+  "name": "Full Browser Sync",
+  "version": "1.0.1",
   "description": "Privacy-first bookmark synchronization. No account, end-to-end encrypted.",
   "permissions": [
     "bookmarks",
@@ -10,7 +10,7 @@
     "downloads"
   ],
   "host_permissions": [
-    "https://sync.satoshihost.com/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"

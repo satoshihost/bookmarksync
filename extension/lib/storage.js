@@ -1,4 +1,4 @@
-// Storage module for BookmarkSync
+// Storage module for Full Browser Sync
 // Wrapper around chrome.storage.local for settings management
 
 /**

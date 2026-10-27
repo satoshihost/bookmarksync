@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Browser Sync — Web Viewer & Info Guide</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --border: #334155;
+            --folder-color: #f59e0b;
+            --link-color: #60a5fa;
+            --error-bg: #7f1d1d;
+            --error-text: #fca5a5;
+            --badge-bg: #0284c7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 920px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Nav Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 0.75rem 1.25rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.65rem 0.85rem;
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: #000;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn:active {
+            transform: scale(0.99);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #errorBox {
+            display: none;
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        .controls-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .stats-badge {
+            font-size: 0.85rem;
+            background: var(--bg);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .tree-view {
+            display: none;
+            font-size: 0.95rem;
+        }
+
+        ul.tree-list {
+            list-style: none;
+            padding-left: 1.2rem;
+        }
+
+        .tree-view > ul.tree-list {
+            padding-left: 0;
+        }
+
+        li.tree-item {
+            margin: 0.3rem 0;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            user-select: none;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+
+        .folder-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .folder-icon {
+            color: var(--folder-color);
+            font-size: 1.1rem;
+        }
+
+        .folder-title {
+            font-weight: 600;
+        }
+
+        .folder-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-left: 0.3rem;
+        }
+
+        .bookmark-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: var(--link-color);
+            text-decoration: none;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            word-break: break-all;
+            transition: background 0.15s;
+        }
+
+        .bookmark-link:hover {
+            background: rgba(255, 255, 255, 0.05);
+            text-decoration: underline;
+        }
+
+        .bookmark-icon {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .collapsed > ul {
+            display: none;
+        }
+
+        .chevron {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.15s;
+            display: inline-block;
+            width: 12px;
+        }
+
+        .collapsed > .folder-header > .chevron {
+            transform: rotate(-90deg);
+        }
+
+        /* Info Guide Styling */
+        .info-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .info-section h3 {
+            font-size: 1.1rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-section p, .info-section ul {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .info-section ul {
+            padding-left: 1.2rem;
+        }
+
+        .info-section li {
+            margin-bottom: 0.4rem;
+        }
+
+        .code-inline {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #38bdf8;
+            font-size: 0.9em;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            background: var(--badge-bg);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Accordion / Expandable Specs Styling */
+        details.spec-accordion {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 1rem;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        details.spec-accordion:hover {
+            border-color: var(--accent);
+        }
+
+        details.spec-accordion summary {
+            padding: 0.85rem 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            cursor: pointer;
+            user-select: none;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        details.spec-accordion summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.spec-accordion summary::after {
+            content: "▶";
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        details.spec-accordion[open] summary::after {
+            transform: rotate(90deg);
+        }
+
+        details.spec-accordion .spec-content {
+            padding: 1rem 1.1rem;
+            border-top: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.15);
+            font-size: 0.9rem;
+            color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Full Browser Sync</h1>
+            <p>Self-Hosted, Privacy-First Bookmark Synchronization for Chromium Browsers</p>
+        </header>
+
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="viewer">📚 Web Viewer</button>
+            <button class="tab-btn" data-tab="guide">ℹ️ User Guide & FAQ</button>
+            <button class="tab-btn" data-tab="server">🚀 Server & Extension</button>
+        </nav>
+
+        <!-- TAB 1: WEB VIEWER -->
+        <div class="tab-content active" id="tab-viewer">
+            <div class="card">
+                <h2>🔍 Web Bookmark Viewer</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="serverUrl">Server URL</label>
+                        <input type="text" id="serverUrl" value="https://sync.satoshihost.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="syncId">Sync ID</label>
+                        <input type="text" id="syncId" placeholder="e.g. andy or UUID">
+                    </div>
+                    <div class="form-group">
+                        <label for="passphrase">Passphrase</label>
+                        <input type="password" id="passphrase" placeholder="Your encryption passphrase">
+                    </div>
+                </div>
+                <button class="btn" id="loadBtn">Decrypt & View Bookmarks</button>
+                <div id="errorBox"></div>
+            </div>
+
+            <div class="controls-bar" id="controlsBar">
+                <input type="text" class="search-box" id="searchInput" placeholder="Search bookmarks by title or URL...">
+                <div class="stats-badge" id="statsBadge">0 Bookmarks</div>
+            </div>
+
+            <div class="card tree-view" id="treeView">
+                <div id="treeContainer"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: USER GUIDE & FAQ -->
+        <div class="tab-content" id="tab-guide">
+            <div class="card">
+                <h2>🔐 How Full Browser Sync Works</h2>
+                <div class="info-section">
+                    <h3>Zero-Knowledge End-to-End Encryption</h3>
+                    <p>
+                        Your bookmarks are encrypted <strong>client-side inside your browser</strong> using strong <strong>AES-256-GCM</strong> encryption before anything is sent over the network.
+                        Key derivation uses <strong>PBKDF2</strong> with 100,000 iterations and SHA-256.
+                    </p>
+                    <p>
+                        The server only ever sees encrypted blobs. Without your Passphrase, nobody (including the server operator) can read or decrypt your bookmarks.
+                    </p>
+
+                    <details class="spec-accordion">
+                        <summary>🔒 Deep Dive: Technical Security & Cryptographic Specs</summary>
+                        <div class="spec-content">
+                            <ul>
+                                <li><strong>Symmetric Cipher:</strong> AES-256-GCM (Galois/Counter Mode) authenticated encryption via native WebCrypto API (<span class="code-inline">crypto.subtle</span>).</li>
+                                <li><strong>Key Derivation Function (KDF):</strong> PBKDF2 with HMAC-SHA-256 and 100,000 iterations (intentionally CPU-hardened against dictionary attacks).</li>
+                                <li><strong>Initialization Vector (IV):</strong> 12-byte (96-bit) cryptographically random IV generated per upload pass via <span class="code-inline">crypto.getRandomValues()</span>.</li>
+                                <li><strong>Zero-Knowledge Architecture:</strong> Encryption and decryption occur strictly inside your browser. Neither your passphrase nor unencrypted data touches disk or network on the server.</li>
+                                <li><strong>Change Hashing:</strong> SHA-256 digest digests for server revision verification.</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🛡️ Cross-Browser Sync & Safety Guards</h2>
+                <div class="info-section">
+                    <h3>Multi-Browser Support & Data Protection</h3>
+                    <p>
+                        Full Browser Sync supports syncing seamlessly across Chromium browsers (Chrome, Brave, Edge) and Firefox, with automated data loss prevention safeguards.
+                    </p>
+                    <ul>
+                        <li><strong>Cross-Browser Root Folder Mapping:</strong> Automatically maps folder names between Chromium (<span class="code-inline">Bookmarks bar</span>, <span class="code-inline">Other bookmarks</span>) and Firefox (<span class="code-inline">Bookmarks Toolbar</span>, <span class="code-inline">Bookmarks Menu</span>).</li>
+                        <li><strong>Automated Pre-Restore Local Safety Backup:</strong> Saves an automatic snapshot of your current bookmarks into local extension storage before any restore or import, with 1-click rollback UI.</li>
+                        <li><strong>Pre-Restore Validation Guard:</strong> Validates payload structure and bookmark counts before touching local data, preventing empty or corrupted sync payloads from wiping local bookmarks.</li>
+                    </ul>
+
+                    <details class="spec-accordion">
+                        <summary>⚙️ Deep Dive: Cross-Browser Compatibility & Filtering Specs</summary>
+                        <div class="spec-content">
+                            <ul>
+                                <li><strong>Smart Scheme Filtering:</strong> Automatically filters Firefox-internal query shortcuts (such as <span class="code-inline">place:</span> URLs) during sync so Chromium browsers never throw API rejection exceptions.</li>
+                                <li><strong>Separate Extension Packages:</strong> Independent MV3 builds for Chrome (<span class="code-inline">extension/</span> using background service workers) and Firefox (<span class="code-inline">extension-firefox/</span> using background scripts).</li>
+                                <li><strong>Non-Destructive Folder Merging:</strong> Preserves browser-owned root folder IDs while safely recreating nested bookmark hierarchies.</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🆔 Choosing Your Sync ID</h2>
+                <div class="info-section">
+                    <h3>Can I use any Sync ID? <span class="feature-badge">New</span></h3>
+                    <p>
+                        <strong>Yes!</strong> You can choose any Sync ID you like — such as <span class="code-inline">andy</span>, <span class="code-inline">andy-laptop</span>, or <span class="code-inline">my-bookmarks</span> — as long as it's between 3 and 64 characters (letters, numbers, hyphens, and underscores).
+                    </p>
+                    <ul>
+                        <li><strong>Custom Names:</strong> Pick a memorable Sync ID like <span class="code-inline">andy</span> to easily connect all your browsers.</li>
+                        <li><strong>Random UUIDs:</strong> Click the "Generate" button in the extension popup to generate a random 36-character UUID v4.</li>
+                        <li><strong>Unique Ownership:</strong> Whichever Sync ID you pick, as long as it isn't already used by someone else on the server, it becomes your private sync container!</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚡ Automatic Sync & Change Detection</h2>
+                <div class="info-section">
+                    <h3>How changes sync across browsers</h3>
+                    <ul>
+                        <li><strong>Instant Debounced Push:</strong> Whenever you add, delete, rename, or move a bookmark, the extension waits 5 seconds for rapid edits to complete, then pushes an encrypted update to the server.</li>
+                        <li><strong>Periodic Pull:</strong> Background periodic alarms check the server every 10 minutes (configurable in Settings) to pull changes made on other devices.</li>
+                        <li><strong>Sync Now & Force Controls:</strong> Use <strong>Sync Now</strong> or the <strong>⬇ Force Download</strong> and <strong>⬆ Force Upload</strong> buttons in the popup to sync immediately at any time.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SERVER & EXTENSION INFO -->
+        <div class="tab-content" id="tab-server">
+            <div class="card">
+                <h2>🌐 Server Information & Status</h2>
+                <div class="info-section">
+                    <p><strong>Live Server API:</strong> <span class="code-inline">https://sync.satoshihost.com</span></p>
+                    <p><strong>Health Check Endpoint:</strong> <a href="https://sync.satoshihost.com/status" target="_blank" style="color: var(--accent);">https://sync.satoshihost.com/status</a></p>
+                    <p><strong>Max Sync Size:</strong> 2 MB (handles thousands of bookmarks)</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🧩 Installing the Extension</h2>
+                <div class="info-section">
+                    <h3>Supported Browsers</h3>
+                    <p>Full Browser Sync works on all Chromium-based browsers (Chrome, Brave, Edge, Opera, Vivaldi).</p>
+                    <ul>
+                        <li>1. Open <span class="code-inline">chrome://extensions</span> or <span class="code-inline">brave://extensions</span> in your browser.</li>
+                        <li>2. Enable <strong>Developer mode</strong> (toggle in top right).</li>
+                        <li>3. Click <strong>Load unpacked</strong> and select the <span class="code-inline">extension/</span> folder.</li>
+                        <li>4. Enter your <strong>Server URL</strong>, <strong>Sync ID</strong>, and <strong>Passphrase</strong> in the extension popup.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Full Browser Sync • End-to-End Encrypted Sync • <a href="https://github.com/satoshihost/bookmarksync" target="_blank">GitHub Repository</a>
+        </footer>
+    </div>
+
+    <script>
+        // Tab Navigation Logic
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        const PBKDF2_ITERATIONS = 100000;
+        const SALT = new TextEncoder().encode("bookmarksync-v1");
+
+        async function deriveKey(passphrase) {
+            const raw = await crypto.subtle.importKey(
+                "raw",
+                new TextEncoder().encode(passphrase),
+                "PBKDF2",
+                false,
+                ["deriveKey"]
+            );
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: SALT, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+                raw,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        function isPlaintextData(data) {
+            try {
+                const text = new TextDecoder().decode(data);
+                const trimmed = text.trim();
+                return (trimmed.startsWith('{') || trimmed.startsWith('[')) && text.includes('"version"');
+            } catch {
+                return false;
+            }
+        }
+
+        async function decryptBlob(passphrase, data) {
+            if (isPlaintextData(data)) {
+                return new TextDecoder().decode(data);
+            }
+            const key = await deriveKey(passphrase);
+            const iv = data.slice(0, 12);
+            const ciphertext = data.slice(12);
+            const plaintext = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv },
+                key,
+                ciphertext
+            );
+            return new TextDecoder().decode(plaintext);
+        }
+
+        document.getElementById('loadBtn').addEventListener('click', loadBookmarks);
+
+        let currentBookmarkTree = null;
+
+        async function loadBookmarks() {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            const syncId = document.getElementById('syncId').value.trim();
+            const passphrase = document.getElementById('passphrase').value;
+            const errorBox = document.getElementById('errorBox');
+            const loadBtn = document.getElementById('loadBtn');
+
+            errorBox.style.display = 'none';
+            if (!serverUrl || !syncId || !passphrase) {
+                showError('Please fill in Server URL, Sync ID, and Passphrase.');
+                return;
+            }
+
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Downloading & Decrypting...';
+
+            try {
+                const res = await fetch(`${serverUrl}/sync/${syncId}`);
+                if (!res.ok) {
+                    if (res.status === 404) throw new Error('Sync ID not found on server.');
+                    throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+                }
+                const buf = await res.arrayBuffer();
+                const uint8 = new Uint8Array(buf);
+
+                let plaintext;
+                try {
+                    plaintext = await decryptBlob(passphrase, uint8);
+                } catch (e) {
+                    throw new Error('Decryption failed. Please check your Passphrase.');
+                }
+
+                const data = JSON.parse(plaintext);
+                if (!data || !Array.isArray(data.bookmarks)) {
+                    throw new Error('Invalid bookmark structure received.');
+                }
+
+                currentBookmarkTree = data.bookmarks;
+                renderTree(currentBookmarkTree);
+                document.getElementById('controlsBar').style.display = 'flex';
+                document.getElementById('treeView').style.display = 'block';
+
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Decrypt & View Bookmarks';
+            }
+        }
+
+        function showError(msg) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+        }
+
+        function renderTree(bookmarks, filterQuery = '') {
+            const container = document.getElementById('treeContainer');
+            container.innerHTML = '';
+
+            let totalCount = 0;
+            const query = filterQuery.toLowerCase().trim();
+
+            function countNode(node) {
+                let cnt = 0;
+                if (node.url) cnt = 1;
+                if (node.children) node.children.forEach(c => cnt += countNode(c));
+                return cnt;
+            }
+
+            function buildNodeElement(node) {
+                const li = document.createElement('li');
+                li.className = 'tree-item';
+
+                if (node.url) {
+                    if (query && !node.title.toLowerCase().includes(query) && !node.url.toLowerCase().includes(query)) {
+                        return null; // Excluded by filter
+                    }
+                    totalCount++;
+                    const a = document.createElement('a');
+                    a.className = 'bookmark-link';
+                    a.href = node.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.innerHTML = `<span class="bookmark-icon">🔗</span> ${escapeHtml(node.title || node.url)}`;
+                    li.appendChild(a);
+                    return li;
+                } else if (node.children) {
+                    const childElements = [];
+                    for (const child of node.children) {
+                        const childEl = buildNodeElement(child);
+                        if (childEl) childElements.push(childEl);
+                    }
+
+                    if (query && childElements.length === 0) {
+                        return null; // Empty folder under query
+                    }
+
+                    const folderHeader = document.createElement('div');
+                    folderHeader.className = 'folder-header';
+                    const nodeCount = countNode(node);
+                    folderHeader.innerHTML = `
+                        <span class="chevron">▼</span>
+                        <span class="folder-icon">📁</span>
+                        <span class="folder-title">${escapeHtml(node.title || 'Folder')}</span>
+                        <span class="folder-count">(${nodeCount})</span>
+                    `;
+
+                    folderHeader.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        li.classList.toggle('collapsed');
+                    });
+
+                    const ul = document.createElement('ul');
+                    ul.className = 'tree-list';
+                    childElements.forEach(el => ul.appendChild(el));
+
+                    li.appendChild(folderHeader);
+                    li.appendChild(ul);
+                    if (query) {
+                        li.classList.remove('collapsed'); // Expand automatically when searching
+                    }
+                    return li;
+                }
+                return null;
+            }
+
+            const rootUl = document.createElement('ul');
+            rootUl.className = 'tree-list';
+
+            if (bookmarks && bookmarks[0] && bookmarks[0].children) {
+                for (const topFolder of bookmarks[0].children) {
+                    const topEl = buildNodeElement(topFolder);
+                    if (topEl) rootUl.appendChild(topEl);
+                }
+            }
+
+            container.appendChild(rootUl);
+            document.getElementById('statsBadge').textContent = `${totalCount} Bookmarks`;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            if (currentBookmarkTree) {
+                renderTree(currentBookmarkTree, e.target.value);
+            }
+        });
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+            }[m]));
+        }
+    </script>
+</body>
+</html>

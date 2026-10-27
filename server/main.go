@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -17,14 +19,15 @@ import (
 
 const (
 	maxSyncSize = 2 * 1024 * 1024 // 2MB
-	dataDir     = "./data"
-	version     = "1.0.0"
+	version     = "1.0.1"
 	port        = ":8080"
 )
 
 var (
+	dataDir      = "./data"
 	rateLimits   = make(map[string]time.Time)
 	rateLimitsMu sync.Mutex
+	storeMu      sync.Mutex
 )
 
 func main() {
@@ -66,7 +69,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("BookmarkSync server v%s starting on %s", version, port)
+	log.Printf("Full Browser Sync server v%s starting on %s", version, port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server error: %v", err)
 	}
@@ -78,7 +81,9 @@ func withCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Expected-Rev")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Sync-Rev, Last-Modified")
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Access-Control-Max-Age", "3600")
 		next(w, r)
 	}
@@ -99,10 +104,46 @@ func blobPath(id string) string {
 	return filepath.Join(dataDir, id+".blob")
 }
 
-// Helper: Validate UUID
-func isValidUUID(s string) bool {
-	_, err := uuid.Parse(s)
-	return err == nil
+// Helper: Get hash sidecar file path (legacy; removed on DELETE)
+func hashPath(id string) string {
+	return filepath.Join(dataDir, id+".hash")
+}
+
+// Helper: Get revision sidecar file path
+func revPath(id string) string {
+	return filepath.Join(dataDir, id+".rev")
+}
+
+// readRev returns the current revision for a sync ID.
+// Missing or unreadable sidecars are revision 0 (including blobs from before
+// this counter existed).
+func readRev(id string) int {
+	b, err := os.ReadFile(revPath(id))
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(b)))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+func writeRev(id string, rev int) error {
+	return os.WriteFile(revPath(id), []byte(strconv.Itoa(rev)), 0644)
+}
+
+// Helper: Validate Sync ID (UUID v4 or 3-64 character alphanumeric string with hyphens/underscores)
+func isValidSyncID(s string) bool {
+	if len(s) < 3 || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '-' && r != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 // Helper: Send JSON response
@@ -122,36 +163,35 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 func handleCreate(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	sendJSON(w, map[string]interface{}{
-		"id":           id,
-		"lastModified": nil,
+		"id":  id,
+		"rev": 0,
 	})
 }
 
 // GET /sync/{id} - Download encrypted blob
 func handleGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !isValidUUID(id) {
+	if !isValidSyncID(id) {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	path := blobPath(id)
-	f, err := os.Open(path)
+	storeMu.Lock()
+	data, err := os.ReadFile(blobPath(id))
+	rev := readRev(id)
+	storeMu.Unlock()
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	defer f.Close()
-
-	stat, err := f.Stat()
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		if os.IsNotExist(err) {
+			http.Error(w, "not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "storage error", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Last-Modified", stat.ModTime().UTC().Format(http.TimeFormat))
-	if _, err := io.Copy(w, f); err != nil {
+	w.Header().Set("X-Sync-Rev", strconv.Itoa(rev))
+	if _, err := w.Write(data); err != nil {
 		log.Printf("Error sending blob: %v", err)
 	}
 }
@@ -159,22 +199,25 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 // PUT /sync/{id} - Upload encrypted blob
 func handlePut(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !isValidUUID(id) {
+	if !isValidSyncID(id) {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	// Rate limiting: max 1 PUT per sync ID per 30 seconds
-	rateLimitsMu.Lock()
-	if last, ok := rateLimits[id]; ok && time.Since(last) < 30*time.Second {
-		rateLimitsMu.Unlock()
-		http.Error(w, "rate limited", http.StatusTooManyRequests)
-		return
+	expectedHeader := strings.TrimSpace(r.Header.Get("X-Expected-Rev"))
+	var expectedRev int
+	checkExpected := false
+	if expectedHeader != "" {
+		n, err := strconv.Atoi(expectedHeader)
+		if err != nil || n < 0 {
+			http.Error(w, "invalid X-Expected-Rev", http.StatusBadRequest)
+			return
+		}
+		expectedRev = n
+		checkExpected = true
 	}
-	rateLimits[id] = time.Now()
-	rateLimitsMu.Unlock()
 
-	// Limit body size
+	// Limit body size before taking the store lock
 	r.Body = http.MaxBytesReader(w, r.Body, maxSyncSize)
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -182,28 +225,66 @@ func handlePut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write to file
+	storeMu.Lock()
+	defer storeMu.Unlock()
+
+	current := readRev(id)
+	if checkExpected && expectedRev != current {
+		w.WriteHeader(http.StatusConflict)
+		sendJSON(w, map[string]interface{}{
+			"error": "revision mismatch",
+			"rev":   current,
+		})
+		return
+	}
+
+	// Rate limiting: max 1 PUT per sync ID per 5 seconds
+	rateLimitsMu.Lock()
+	if last, ok := rateLimits[id]; ok && time.Since(last) < 5*time.Second {
+		rateLimitsMu.Unlock()
+		http.Error(w, "rate limited", http.StatusTooManyRequests)
+		return
+	}
+	rateLimits[id] = time.Now()
+	rateLimitsMu.Unlock()
+
 	if err := os.WriteFile(blobPath(id), data, 0644); err != nil {
 		log.Printf("Error writing blob: %v", err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
 
-	sendJSON(w, map[string]string{
-		"lastModified": time.Now().UTC().Format(time.RFC3339),
+	newRev := current + 1
+	if err := writeRev(id, newRev); err != nil {
+		log.Printf("Error writing revision sidecar: %v", err)
+		http.Error(w, "storage error", http.StatusInternalServerError)
+		return
+	}
+
+	sendJSON(w, map[string]interface{}{
+		"rev": newRev,
 	})
 }
 
 // DELETE /sync/{id} - Delete sync data
 func handleDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !isValidUUID(id) {
+	if !isValidSyncID(id) {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
+	storeMu.Lock()
+	defer storeMu.Unlock()
+
 	if err := os.Remove(blobPath(id)); err != nil && !os.IsNotExist(err) {
 		log.Printf("Error deleting blob: %v", err)
+	}
+	if err := os.Remove(hashPath(id)); err != nil && !os.IsNotExist(err) {
+		log.Printf("Error deleting hash sidecar: %v", err)
+	}
+	if err := os.Remove(revPath(id)); err != nil && !os.IsNotExist(err) {
+		log.Printf("Error deleting revision sidecar: %v", err)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -211,19 +292,22 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 // GET /sync/{id}/info - Get last modified time without downloading blob
 func handleInfo(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !isValidUUID(id) {
+	if !isValidSyncID(id) {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 
-	stat, err := os.Stat(blobPath(id))
-	if err != nil {
+	storeMu.Lock()
+	defer storeMu.Unlock()
+
+	// Confirm the blob exists
+	if _, err := os.Stat(blobPath(id)); err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	sendJSON(w, map[string]string{
-		"lastModified": stat.ModTime().UTC().Format(time.RFC3339),
+	sendJSON(w, map[string]interface{}{
+		"rev": readRev(id),
 	})
 }
 

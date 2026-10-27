@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Full Browser Sync",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Privacy-first bookmark synchronization. No account, end-to-end encrypted.",
   "permissions": [
     "bookmarks",

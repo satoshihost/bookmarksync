@@ -65,10 +65,10 @@ The server is genuinely stateless from a business logic perspective: it's a key-
 
 - No mobile app (extension only, at least to start)
 - No bookmark sharing / public links (complexity not worth it)
-- No conflict resolution beyond last-write-wins (same as xBrowserSync — keeps it simple)
+- No automatic merge / conflict resolution — writes are last-write-wins, but concurrent-change conflicts are detected via the revision counter and surfaced as HTTP 409
 - No accounts, email, passwords on the server
 - No database
-- No web UI on the server
+- No server-side UI or accounts — the read-only `www/index.html` Web Viewer is a static page that decrypts in the browser
 - No analytics, telemetry, or tracking of any kind
 - No monetisation complexity (cheap VPS, donation model if anything)
 
@@ -100,15 +100,16 @@ The `version` field allows future schema changes without breaking existing clien
 
 **Last write wins, full replacement.** The entire bookmark tree is replaced on each sync. No per-bookmark diffing, no merge logic. This is the same approach xBrowserSync used and it's the right call — merge logic is where complexity explodes (see: floccus).
 
-The client stores a `lastModified` timestamp locally. On sync:
-1. Fetch the server's `lastModified` header
-2. If server is newer → download and replace local bookmarks
-3. If local is newer → encrypt and upload
-4. If equal → do nothing
+Each browser stores `lastSyncRev` (the server revision of the last successful sync), `localDirty` (whether local bookmarks changed since then), and `syncDataVersion` (currently `2`) locally. On sync:
+1. Read the current server revision from `GET /sync/{id}/info` (or the `X-Sync-Rev` header of a download).
+2. If both the local bookmarks and the server revision changed since the last sync → stop and surface the conflict; never silently overwrite.
+3. If only local changed → upload with `X-Expected-Rev` set to the base revision; a concurrent server change returns HTTP 409.
+4. If only the server changed → download with `cache: 'no-store'` and record the `X-Sync-Rev` of that exact response (not a later `/info` read).
+5. If neither changed → report "already in sync".
 
-This is sufficient for the primary use case (one person, a few machines). Race conditions are possible but rare and recoverable.
+A browser without `syncDataVersion: 2` (a new install, or pre-revision data) must explicitly choose an initial upload or download.
 
-Before automatic hosted sync ships, replace unconditional uploads with a server revision or ETag-style conditional write. This prevents two devices from silently overwriting each other's changes.
+For the primary use case (one person, a few machines) this is sufficient — and the revision counter turns what would be a silent overwrite into a detectable 409 conflict.
 
 ## Future Import Review
 
@@ -124,9 +125,9 @@ Single static binary, no runtime, no dependency manager on the server. Compiles 
 
 ### Storage: Flat files
 
-Each sync ID maps to one file: `data/{uuid}.blob`
+Each sync ID maps to two files: `data/{id}.blob` (ciphertext) and `data/{id}.rev` (a monotonic revision counter).
 
-No database. No ORM. No migrations. A UUID is a 36-character string; 10,000 users = 10,000 files in one directory, trivially handled by any filesystem.
+No database. No ORM. No migrations. An `id` is either a UUID v4 or a custom 3–64 character name, so at most 64 characters; 10,000 users = 20,000 files in one directory, trivially handled by any filesystem.
 
 ### Infrastructure
 
@@ -142,13 +143,13 @@ POST   /sync              Create new sync ID
 
 GET    /sync/{id}         Download encrypted blob
                           Response: raw blob bytes (application/octet-stream)
-                          Headers: Last-Modified
+                          Headers: X-Sync-Rev (paired revision), Cache-Control: no-store
                           404 if not found
 
 PUT    /sync/{id}         Upload encrypted blob
                           Body: raw blob bytes (application/octet-stream)
                           Max body: 2MB
-                          Headers: X-Expected-Rev (optional optimistic concurrency check)
+                          Headers: X-Expected-Rev (mismatch → HTTP 409)
                           Response: { "rev": N }
 
 DELETE /sync/{id}         Delete sync data
@@ -158,136 +159,20 @@ GET    /sync/{id}/info    Lightweight check — no body download
                           Response: { "rev": N }
 
 GET    /status            Server health check
-                          Response: { "status": "online", "version": "1.0.0", "maxSyncSize": 2097152 }
+                          Response: { "status": "online", "version": "1.0.1", "maxSyncSize": 2097152 }
 ```
 
-No authentication beyond the UUID itself (unguessable = bearer token). The UUID is generated client-side (crypto.randomUUID()) and never stored server-side in any user-linked way.
+No authentication beyond the Sync ID itself. A Sync ID may be a random UUID v4 generated client-side, or a custom 3–64 character name (`[A-Za-z0-9_-]`) — so memorable IDs like `andy` are allowed, which means a guessable ID relies on a strong passphrase. The server never links an ID to a user and never receives the passphrase.
 
 ### Rate Limiting
 
-- Max 1 PUT per sync ID per 30 seconds (in-memory, resets on restart — fine for this use case)
+- Max 1 PUT per sync ID per 5 seconds (in-memory, resets on restart — fine for this use case)
 - Max body size: 2MB (enforced by Go's http.MaxBytesReader)
 - No rate limiting on GET (reads are cheap; caching headers help)
 
 ### Server Code Sketch
 
-```go
-package main
-
-import (
-    "encoding/json"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "sync"
-    "time"
-
-    "github.com/google/uuid"
-)
-
-const (
-    maxSyncSize = 2 * 1024 * 1024 // 2MB
-    dataDir     = "./data"
-    version     = "1.0.0"
-)
-
-var (
-    rateLimits   = make(map[string]time.Time)
-    rateLimitsMu sync.Mutex
-)
-
-func main() {
-    os.MkdirAll(dataDir, 0755)
-
-    mux := http.NewServeMux()
-    mux.HandleFunc("POST /sync", handleCreate)
-    mux.HandleFunc("GET /sync/{id}", handleGet)
-    mux.HandleFunc("PUT /sync/{id}", handlePut)
-    mux.HandleFunc("DELETE /sync/{id}", handleDelete)
-    mux.HandleFunc("GET /sync/{id}/info", handleInfo)
-    mux.HandleFunc("GET /status", handleStatus)
-
-    http.ListenAndServe(":8080", mux)
-}
-
-func blobPath(id string) string {
-    return filepath.Join(dataDir, id+".blob")
-}
-
-func isValidUUID(s string) bool {
-    _, err := uuid.Parse(s)
-    return err == nil
-}
-
-func handleCreate(w http.ResponseWriter, r *http.Request) {
-    id := uuid.New().String()
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]any{"id": id, "lastModified": nil})
-}
-
-func handleGet(w http.ResponseWriter, r *http.Request) {
-    id := r.PathValue("id")
-    if !isValidUUID(id) { http.Error(w, "invalid id", 400); return }
-    path := blobPath(id)
-    f, err := os.Open(path)
-    if err != nil { http.Error(w, "not found", 404); return }
-    defer f.Close()
-    stat, _ := f.Stat()
-    w.Header().Set("Content-Type", "application/octet-stream")
-    w.Header().Set("Last-Modified", stat.ModTime().UTC().Format(http.TimeFormat))
-    io.Copy(w, f)
-}
-
-func handlePut(w http.ResponseWriter, r *http.Request) {
-    id := r.PathValue("id")
-    if !isValidUUID(id) { http.Error(w, "invalid id", 400); return }
-
-    // Rate limiting
-    rateLimitsMu.Lock()
-    if last, ok := rateLimits[id]; ok && time.Since(last) < 30*time.Second {
-        rateLimitsMu.Unlock()
-        http.Error(w, "rate limited", 429); return
-    }
-    rateLimits[id] = time.Now()
-    rateLimitsMu.Unlock()
-
-    r.Body = http.MaxBytesReader(w, r.Body, maxSyncSize)
-    data, err := io.ReadAll(r.Body)
-    if err != nil { http.Error(w, "body too large or read error", 400); return }
-
-    if err := os.WriteFile(blobPath(id), data, 0644); err != nil {
-        http.Error(w, "storage error", 500); return
-    }
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{"lastModified": time.Now().UTC().Format(time.RFC3339)})
-}
-
-func handleDelete(w http.ResponseWriter, r *http.Request) {
-    id := r.PathValue("id")
-    if !isValidUUID(id) { http.Error(w, "invalid id", 400); return }
-    os.Remove(blobPath(id))
-    w.WriteHeader(204)
-}
-
-func handleInfo(w http.ResponseWriter, r *http.Request) {
-    id := r.PathValue("id")
-    if !isValidUUID(id) { http.Error(w, "invalid id", 400); return }
-    stat, err := os.Stat(blobPath(id))
-    if err != nil { http.Error(w, "not found", 404); return }
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{"lastModified": stat.ModTime().UTC().Format(time.RFC3339)})
-}
-
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]any{
-        "status": "online", "version": version, "maxSyncSize": maxSyncSize,
-    })
-}
-```
-
-This is the near-complete server. Real implementation adds CORS headers, request logging, and graceful shutdown — but the logic above is essentially it.
+The complete, current implementation lives in [`server/main.go`](server/main.go) and is the single source of truth for server behaviour: flat-file storage (`{id}.blob` plus a `{id}.rev` revision sidecar), custom Sync ID validation, `X-Sync-Rev` on downloads and `X-Expected-Rev` with HTTP 409 conflict handling on uploads, `Cache-Control: no-store`, CORS, request logging, timeouts, rate limiting, and graceful shutdown.
 
 ---
 
@@ -327,7 +212,7 @@ server/
 tools/
   merge_bookmark_exports.py  # One-off utility: merge and de-duplicate multiple exports
 
-www/                    # Static info page served at sync.satoshihost.com
+www/                    # Static Web Viewer + user guide served at sync.satoshihost.com
   favicons/
 ```
 
@@ -337,7 +222,7 @@ www/                    # Static info page served at sync.satoshihost.com
 {
   "manifest_version": 3,
   "name": "Full Browser Sync",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Privacy-first bookmark synchronization. No account, end-to-end encrypted.",
   "permissions": ["bookmarks", "storage", "alarms", "downloads"],
   "host_permissions": ["<all_urls>"],
@@ -423,8 +308,10 @@ Automatic local-folder sync (e.g. watching a Syncthing folder) requires a native
   "passphrase": "...",
   "serverUrl": "https://sync.yourdomain.com",
   "autoSync": true,
-  "syncInterval": 30,
-  "lastModified": "RFC3339 timestamp — last successful server sync",
+  "syncInterval": 10,
+  "lastSyncRev": 0,
+  "syncDataVersion": 2,
+  "localDirty": false,
   "lastSync": "ISO timestamp — last sync attempt",
   "lastSyncError": "error message from last failed sync, if any"
 }
@@ -484,7 +371,7 @@ Zero downtime deploys: the new binary is a single file copy + service restart (~
 ## Compatibility Notes
 
 - **Chrome**: MV3 required. Service workers supported since Chrome 88.
-- **Firefox**: MV3 supported since Firefox 109 (May 2023), though Firefox still accepts MV2. We target MV3 for future-proofing.
+- **Firefox**: support is discontinued. The Firefox build was dropped after a Mozilla AMO policy rejection; see [`extension-firefox-not-continuing/`](extension-firefox-not-continuing/README.md). Development targets Chromium-based browsers.
 - **Safari**: Would need a separate build via Xcode's web extension converter. Not a priority.
 - **`chrome.bookmarks` API**: Works identically in Chrome and Firefox (Firefox implements the Chrome extension APIs). No browser-specific code needed for bookmark access.
 
@@ -500,13 +387,13 @@ See `PROGRESS.md` for the live tracker. Summary:
 - [x] Extension: bookmark read/write helpers
 - [x] Extension: local backup — export (Save As) and import (file picker + safety backup)
 - [x] Extension: popup UI (Local backup tab, Sync tab, Settings tab)
-- [x] Extension: server sync — upload, download, timestamp comparison, first-sync prompt
-- [x] Extension: auto-sync on bookmark change (debounced, 5 s) and on alarm (30 min)
+- [x] Extension: server sync — upload, download, revision-based change detection, first-sync prompt
+- [x] Extension: auto-sync on bookmark change (debounced, 5 s) and on alarm (default 10 min, configurable)
 - [x] Tools: `tools/merge_bookmark_exports.py` — de-duplicate and merge multiple exports
-- [ ] Testing: Chrome end-to-end
-- [ ] Testing: Firefox
+- [x] Testing: Chrome/Chromium end-to-end (core sync loop verified)
+- [ ] Testing: Firefox — discontinued
 - [ ] Chrome Web Store submission
-- [ ] Firefox Add-ons submission
+- [ ] ~~Firefox Add-ons submission~~ — discontinued
 - [ ] Easy self-hosting: pre-built binaries, Docker image, .deb packages
 
 ---

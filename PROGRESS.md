@@ -1,6 +1,6 @@
 # Full Browser Sync - Development Progress
 
-**Last Updated:** 2026-09-28
+**Last Updated:** 2026-10-27
 
 > [!NOTE]
 > **Firefox Status:** Firefox extension submission / packaging has been abandoned per user decision following Mozilla's generic AMO policy rejection. Primary development focus is 100% on Chromium-based browsers (`extension/`).
@@ -18,7 +18,7 @@
   - DELETE /sync/{id} (delete)
   - GET /sync/{id}/info (metadata)
   - GET /status (health check)
-- [x] Rate limiting (1 PUT per 30 seconds per ID)
+- [x] Rate limiting (1 PUT per 5 seconds per ID)
 - [x] Deployed to https://sync.satoshihost.com
 - [x] HTTPS with Let's Encrypt (automatic via Caddy)
 - [x] Security hardened (UFW, fail2ban, SSH keys)
@@ -77,7 +77,7 @@
 
 ### Testing
 Core sync loop confirmed working across 3 browsers. Remaining:
-- [ ] Test in Firefox
+- [x] ~~Test in Firefox~~ — dropped, Firefox discontinued
 - [ ] Test in Opera / Vivaldi
 - [ ] Test edge cases: rate limiting, service worker sleep/wake, clock skew
 
@@ -94,13 +94,14 @@ Core sync loop confirmed working across 3 browsers. Remaining:
 
 ### Testing
 - [x] Test in Chrome/Chromium — core sync loop verified
-- [ ] Test in Firefox
+- [x] ~~Test in Firefox~~ — dropped, Firefox discontinued
 - [ ] Test in Opera
 - [ ] Test in Vivaldi
 
 ### Distribution
-- [ ] Chrome Web Store submission
-- [ ] Firefox Add-ons submission
+- [ ] **Landing/home page framing** — https://sync.satoshihost.com already covers the Web Viewer, User Guide & FAQ, Server & Extension, and Changelog tabs, so it effectively doubles as the landing page. Before store submission, decide whether to present it that way (and whether the popup's GitHub link should point there instead).
+- [ ] **Chrome Web Store submission** — submit Full Browser Sync once the 1.0.2 changes have been fully tried out (Web Viewer docs, popup "Web Viewer" link, extension 1.0.2, site Changelog tab)
+- [x] ~~Firefox Add-ons submission~~ — abandoned (Mozilla AMO policy rejection)
 - [ ] Release binaries (Windows/Mac/Linux)
 - [ ] Docker image
 - [ ] .deb packages
@@ -181,6 +182,15 @@ Planned after the replacement workflow has been tested further. Show source-only
 - **Force Download / Upload buttons (`popup.html`, `popup.js`)**: Added explicit `⬇ Force Download` and `⬆ Force Upload` buttons underneath `Sync Now` in the extension popup.
 - **Extension Manager error badge fix (`background.js`)**: Switched network error logging in auto-sync from `console.error` to `console.warn` so transient network drops don't trigger red error badges in `chrome://extensions`.
 
+### 2026-10-27 — Web Bookmark Viewer documented; extension bumped to 1.0.2
+
+- **Web Viewer documented for users.** README gained a "Web Viewer" section explaining the passphrase page at `https://sync.satoshihost.com/` — enter Server URL + Sync ID + passphrase, and it decrypts in the browser. Notes that there is no account/login and that a guessable custom Sync ID relies on the passphrase alone.
+- **Popup link renamed** from "Server Status" to **"Web Viewer"** (`extension/popup/popup.html`) so the page is discoverable.
+- **README corrected**: removed the stale "hosted server synchronisation is not implemented yet" claim; rate limit 30s → 5s; API table now shows `X-Sync-Rev` / `X-Expected-Rev` / `{rev}`; roadmap Tier 2 checked; Firefox marked discontinued; status line updated.
+- **PROJECT.md refreshed**: revision-based sync model, custom Sync ID validation, `/status` version 1.0.1, server code sketch marked historical (pointer to `server/main.go`), Firefox compatibility note updated.
+- **Version bumped to 1.0.2** (`extension/manifest.json`). Server unchanged at 1.0.1.
+- **Site Changelog tab added** to `www/index.html` — needs deploying to DR1 to go live.
+
 ### Test Credentials
 - Server: https://sync.satoshihost.com
 - Test sync ID: (generate new for testing)
@@ -214,9 +224,8 @@ cd /home/andy/work/projects/browser-sync/extension
 ## 📝 NEXT SESSION PLAN
 
 1. **Polish UI feedback** — "Already up to date" after a manual sync feels wrong when the background already uploaded; show last auto-sync time in the popup status bar so the user understands what happened
-2. **Test in Firefox** — MV3 support landed in Firefox 109; check for any API differences
-3. **Test edge cases** — rate limiting (rapid bookmark adds), service worker sleep mid-debounce, mismatched clocks
-4. **Write the local-sync explainer page** — static page at sync.satoshihost.com explaining why automatic local-folder sync isn't possible from an extension, what does work, and what a future companion app would look like
+2. **Test edge cases** — rate limiting (rapid bookmark adds), service worker sleep mid-debounce, mismatched clocks
+3. **Write the local-sync explainer page** — static page at sync.satoshihost.com explaining why automatic local-folder sync isn't possible from an extension, what does work, and what a future companion app would look like
 
 ---
 

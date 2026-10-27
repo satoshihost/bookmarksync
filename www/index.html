@@ -421,6 +421,7 @@
             <button class="tab-btn active" data-tab="viewer">📚 Web Viewer</button>
             <button class="tab-btn" data-tab="guide">ℹ️ User Guide & FAQ</button>
             <button class="tab-btn" data-tab="server">🚀 Server & Extension</button>
+            <button class="tab-btn" data-tab="changelog">📝 Changelog</button>
         </nav>
 
         <!-- TAB 1: WEB VIEWER -->
@@ -559,6 +560,34 @@
                         <li>2. Enable <strong>Developer mode</strong> (toggle in top right).</li>
                         <li>3. Click <strong>Load unpacked</strong> and select the <span class="code-inline">extension/</span> folder.</li>
                         <li>4. Enter your <strong>Server URL</strong>, <strong>Sync ID</strong>, and <strong>Passphrase</strong> in the extension popup.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: CHANGELOG -->
+        <div class="tab-content" id="tab-changelog">
+            <div class="card">
+                <h2>📝 Changelog</h2>
+                <div class="info-section">
+                    <h3>1.0.2 <span class="feature-badge">Latest</span></h3>
+                    <ul>
+                        <li>Popup footer link renamed to <strong>Web Viewer</strong> (was "Server Status") so this page is easy to find.</li>
+                        <li>Web Viewer usage documented.</li>
+                    </ul>
+                </div>
+                <div class="info-section">
+                    <h3>1.0.1</h3>
+                    <ul>
+                        <li><strong>Revision-based sync:</strong> downloads carry an <span class="code-inline">X-Sync-Rev</span> header and uploads send <span class="code-inline">X-Expected-Rev</span>; a mismatch returns <strong>409</strong> instead of silently overwriting.</li>
+                        <li>Added this <strong>Web Bookmark Viewer</strong> and a Plaintext Debug Mode.</li>
+                        <li>Added <strong>⬇ Force Download</strong> / <strong>⬆ Force Upload</strong> buttons to the popup.</li>
+                    </ul>
+                </div>
+                <div class="info-section">
+                    <h3>1.0.0</h3>
+                    <ul>
+                        <li>Initial release: local backup/import, hosted server sync, AES-256-GCM end-to-end encryption, and cross-browser root folder mapping.</li>
                     </ul>
                 </div>
             </div>

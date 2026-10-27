@@ -14,7 +14,7 @@
 
 Rather than see this excellent idea fade away, Full Browser Sync is a **clean-room rewrite** that preserves the core philosophy while modernizing the implementation:
 
-- ✅ **Manifest V3** compatible (works in modern Chrome/Firefox)
+- ✅ **Manifest V3** compatible (Chromium-based browsers)
 - ✅ **Modern stack** (Go server, contemporary JavaScript)
 - ✅ **Same privacy guarantee** (end-to-end encryption, zero knowledge server)
 - ✅ **Radical simplicity** (no accounts, no tracking, minimal dependencies)
@@ -60,6 +60,22 @@ This project stands on the shoulders of xBrowserSync and aims to carry its spiri
 - **HTTPS:** Automatic Let's Encrypt via Caddy
 - **Extension:** Manifest V3 for Chromium-based browsers (`extension/`)
 
+> **Firefox:** support is discontinued. Development targets Chromium-based browsers (`extension/`); the Firefox build was dropped after a Mozilla AMO policy rejection. See [`extension-firefox-not-continuing/`](extension-firefox-not-continuing/README.md).
+
+---
+
+## Web Viewer
+
+Read your synced bookmarks from any machine — no extension required — at **[sync.satoshihost.com](https://sync.satoshihost.com/)**.
+
+1. Open the viewer and enter your **Server URL**, **Sync ID**, and **Passphrase**.
+2. Click **Decrypt & View Bookmarks**. The page downloads the encrypted blob and decrypts it **in your browser**; the server never sees plaintext.
+3. The bookmark tree appears with a search box.
+
+There is **no account and no login**. Anyone who knows both the Sync ID and the passphrase can read the bookmarks; without the passphrase the blob is unreadable. Because custom Sync IDs (for example `andy`) are guessable, choose a strong passphrase.
+
+If a sync ID was stored in **Plaintext Debug Mode**, the viewer shows it directly, since there is nothing to decrypt — use that mode only for testing.
+
 ---
 
 ## Quick Start
@@ -77,7 +93,7 @@ Load the `extension` directory as an unpacked extension from your browser's exte
 
 Import is a deliberate full replacement, not a merge: bookmarks present only in the destination are removed. Keep the safety backup if you may want to restore the previous state.
 
-Hosted server synchronisation is not implemented yet. The Sync tab currently saves configuration only.
+Hosted server synchronisation is implemented. Once you enter a **Server URL**, **Sync ID**, and **Passphrase**, the extension uploads on bookmark changes (debounced 5 seconds) and checks the server on a configurable interval. Use **Sync Now** or the **⬇ Force Download** / **⬆ Force Upload** buttons in the popup to sync immediately. You can also read the same data in any browser without the extension via the [Web Viewer](#web-viewer).
 
 ### Self-Hosting the Server
 
@@ -163,14 +179,16 @@ The server exposes a minimal REST API:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/sync` | POST | Create new sync ID |
-| `/sync/{id}` | GET | Download encrypted blob |
-| `/sync/{id}` | PUT | Upload encrypted blob |
+| `/sync/{id}` | GET | Download encrypted blob with `X-Sync-Rev` header |
+| `/sync/{id}` | PUT | Upload encrypted blob (send `X-Expected-Rev`; returns `{rev}`; 409 on revision mismatch) |
 | `/sync/{id}` | DELETE | Delete sync data |
-| `/sync/{id}/info` | GET | Get last modified time |
+| `/sync/{id}/info` | GET | Current revision (`{rev}`) without downloading the blob |
 | `/status` | GET | Server health check |
 
-**Rate limits:** Max 1 PUT per sync ID per 30 seconds  
+**Rate limits:** Max 1 PUT per sync ID per 5 seconds  
 **Max body size:** 2MB
+
+A **Sync ID** may be a random UUID v4 or a custom 3–64 character name (letters, digits, hyphen, underscore) — this is what makes memorable IDs like `andy` possible. The static [Web Viewer](#web-viewer) and guide are served at `/`.
 
 See [PROJECT.md](PROJECT.md) for detailed API specification and encryption details.
 
@@ -215,10 +233,10 @@ bookmarksync/
   - [x] Tier 1: Manual local backup/import mode
   - [x] Popup UI
   - [x] Local import safety backup and recovery guidance
-  - [ ] Tier 2: Server sync mode
+  - [x] Tier 2: Server sync mode
   - [x] Crypto module
 - [ ] Chrome Web Store submission
-- [ ] Firefox Add-ons submission
+- [x] ~~Firefox Add-ons submission~~ — discontinued
 - [ ] Easy deployment options
   - [ ] Pre-built binaries (Windows, macOS, Linux)
   - [ ] Docker image
@@ -258,4 +276,4 @@ Special thanks to:
 ---
 
 **Live Instance:** [sync.satoshihost.com](https://sync.satoshihost.com)  
-**Status:** In development — server operational, extension coming soon
+**Status:** Server live and extension functional — hosted sync verified across Chromium browsers; Chrome Web Store submission pending

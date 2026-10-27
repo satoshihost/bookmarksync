@@ -1,6 +1,9 @@
-# BookmarkSync - Development Progress
+# Full Browser Sync - Development Progress
 
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-09-28
+
+> [!NOTE]
+> **Firefox Status:** Firefox extension submission / packaging has been abandoned per user decision following Mozilla's generic AMO policy rejection. Primary development focus is 100% on Chromium-based browsers (`extension/`).
 
 ---
 
@@ -22,7 +25,7 @@
 - [x] Info page with favicons
 - [x] systemd service (auto-restart)
 
-**Server Location:** es6 (86.38.175.91) - `/opt/bookmarksync/`
+**Server Location:** dr1 (198.23.202.164) - `/opt/bookmarksync/`
 
 ### Extension Structure (95% Complete)
 - [x] Manifest V3 configuration
@@ -37,16 +40,28 @@
   - [x] bookmarks.js (Chrome API helpers)
   - [x] storage.js (settings management)
 
-### Extension Features (Partial)
+### Extension Features
 - [x] Generate sync IDs (UUID v4)
 - [x] Save server settings
 - [x] Bookmark counting
 - [x] Tab switching
 - [x] Settings persistence
-- [ ] **Server sync (NOT YET IMPLEMENTED)**
-- [ ] **Automatic periodic sync**
-- [ ] **Initial upload/download**
-- [ ] **Conflict handling**
+- [x] Local bookmark export using the browser's Save As dialog
+- [x] Local bookmark import using the browser's file picker
+- [x] Pre-import safety backup, with a choice of Save As location or Downloads
+- [x] Manual transfer tested: Brave profile → new Brave profile → original Brave profile, including additions and deletions
+- [x] **Server sync — upload, download, timestamp comparison**
+- [x] **First-sync prompt** (server has data → ask upload or download)
+- [x] **Automatic periodic sync** via `chrome.alarms` (default 10 min, configurable)
+- [x] **Sync on bookmark change** — debounced 5 s, upload only; `isBusy` flag prevents sync loops during restore
+- [x] **localDirty flag** — replaces broken timestamp upload logic; clock-skew proof; background resets it after upload, popup resets it after download
+- [x] **End-to-end auto-sync verified** — add/remove on Browser A, Browsers B and C auto-updated within 5 minutes via alarm
+- [x] **Cross-Browser Root Folder Mapping** — Chrome `Bookmarks bar` $\leftrightarrow$ Firefox `Bookmarks Toolbar` / `Bookmarks Menu`
+- [x] **Pre-restore payload validation & empty-tree safety guard** — prevents zero-bookmark payloads from wiping local browser bookmarks
+- [x] **Auto pre-restore local safety backup & 1-click rollback UI** in popup
+- [x] **Smart URL filtering** — strips Firefox `place:` smart bookmarks during sync to prevent Chromium API errors
+- [x] Separate extension packages for Chrome (`extension/`) and Firefox (`extension-firefox/`)
+- [x] `<all_urls>` host permission — supports self-hosted server URLs
 
 ### Repository & Documentation
 - [x] GitHub repo: github.com/satoshihost/bookmarksync
@@ -60,41 +75,11 @@
 
 ## 🔨 IN PROGRESS
 
-### Server Sync Implementation (0%)
-**Next session priority!**
-
-Need to implement:
-1. **First sync setup:**
-   - Generate sync ID
-   - Set passphrase
-   - Choose: Upload current bookmarks OR Download from server
-
-2. **Upload flow:**
-   ```
-   Get bookmarks → JSON → Encrypt → Upload to server
-   ```
-
-3. **Download flow:**
-   ```
-   Download from server → Decrypt → JSON → Restore bookmarks
-   ```
-
-4. **Automatic sync:**
-   - chrome.alarms every 30 minutes (configurable)
-   - Compare lastModified timestamps
-   - Upload if local is newer
-   - Download if server is newer
-   - Skip if equal
-
-5. **Manual sync button:**
-   - Force sync now
-   - Show progress/status
-
-### Files to modify:
-- `extension/popup/popup.js` - Wire up syncNow() function
-- `extension/background.js` - Implement performSync() 
-- Test with encryption/decryption
-- Handle errors gracefully
+### Testing
+Core sync loop confirmed working across 3 browsers. Remaining:
+- [ ] Test in Firefox
+- [ ] Test in Opera / Vivaldi
+- [ ] Test edge cases: rate limiting, service worker sleep/wake, clock skew
 
 ---
 
@@ -108,11 +93,10 @@ Need to implement:
 - [ ] Network error handling
 
 ### Testing
-- [ ] Test in Chrome
+- [x] Test in Chrome/Chromium — core sync loop verified
 - [ ] Test in Firefox
 - [ ] Test in Opera
 - [ ] Test in Vivaldi
-- [ ] Cross-browser sync testing
 
 ### Distribution
 - [ ] Chrome Web Store submission
@@ -122,23 +106,20 @@ Need to implement:
 - [ ] .deb packages
 
 ### Features (Maybe)
-- [ ] Import/export for backup (simple version)
+- [x] Manual bookmark backup/export and full-replacement import
+- [x] Sync on bookmark change
 - [ ] Multiple sync profiles
-- [ ] Sync on bookmark change (not just periodic)
 - [ ] Bookmark conflict resolution UI
 
 ---
 
-## ❌ ABANDONED
+## ⏸️ DEFERRED
 
-### Local File Sync
-**Removed 2026-02-28** - Too complex for little benefit:
-- Browser security restrictions on file access
-- Protected root bookmark folders
-- Complex merge logic
-- User confusion about manual sync
+### Automatic Local File Sync
+Deferred — browser extensions cannot silently keep an arbitrary user-selected file up to date. The implemented local mode is intentionally manual: export a JSON backup from one browser, then import it in another using standard browser dialogs. Automatic local-file sync would require an optional native companion application.
 
-Decision: Focus on server sync (the main feature). Users who want local backups can use browser's native export.
+### Local Import Review
+Planned after the replacement workflow has been tested further. Show source-only additions and destination-only removals before import, initially with grouped keep/remove choices and later optional per-bookmark selection.
 
 ---
 
@@ -152,8 +133,53 @@ Decision: Focus on server sync (the main feature). Users who want local backups 
 - Server API responds correctly
 - Icons display properly
 
-### Known Issues
-- None currently (local sync removed)
+### 2026-09-15 Handoff — manual cross-device consolidation
+
+- Public-facing product name changed to **Full Browser Sync** (manifest, popup, logs, and primary docs). Existing technical identifiers remain `bookmarksync` for deployment and compatibility: Go module, encryption salt, server URL, server directory/binary, and GitHub repository.
+- Six intentional bookmark exports were gathered from three browsers on each of two machines (`hp3` and `hp4`). A verified de-duplicated union was created at:
+  `/home/andy/Documents/Backups/browser data/browser-sync/full-browser-sync-unified-2026-09-15.json`
+- The unified backup contains **1,332 unique URLs** and includes every URL present in those six exports. Safety/test backups in `originals/` and `before-import` were checked and had no additional URLs, so they were not merged. Originals remain untouched.
+- Tomorrow: let Syncthing deliver that unified JSON to the other machine, then import the same file into each browser. Import is intentionally a full replacement and creates a safety backup first. Confirm each browser ends with the same bookmark count/tree.
+- The one-off merger is retained as `tools/merge_bookmark_exports.py`. It prefers the first input's title/folder placement for any duplicate URL and appends URLs missing from later inputs.
+- Immediate local use stays manual: keep one chosen export/union JSON in a Syncthing folder and import it deliberately after changes. Automatic local-folder synchronisation remains a future optional native companion/helper application; it is not feasible from an extension alone because browser extensions cannot silently read and rewrite an arbitrary chosen folder.
+
+### 2026-09-17 Handoff — server sync implemented and verified
+
+- **Server sync fully implemented**: `syncNow()` uploads/downloads with timestamp comparison. First-sync prompt asks user which direction when server already has data.
+- **Auto-sync on bookmark change**: debounced 5 s, upload-only. `isBusy` flag prevents sync loops during restore. All four bookmark change events wired.
+- **Auto-sync checkbox removed**: sync is always-on when configured. No toggle needed.
+- **Sync Now reads from form fields** directly (not storage), so no need to click Save Settings first. Values are saved to storage as a side-effect of syncing.
+- **Warning box added** to Sync tab reminding users to keep their ID and passphrase safe.
+- **Server confusion resolved**: DNS for `sync.satoshihost.com` points to **DR1** (198.23.202.164), not es6. Bookmarksync was moved to DR1 on 2026-04-13. All docs and deploy commands updated to use `ssh dr1`.
+- **es6 cleaned up**: bookmarksync binary, data directory, and systemd unit all removed from es6. Nothing left there.
+- **Upload confirmed working**: blob `2d800de7-5bc4-4915-a1f4-e76a00d100e2.blob` on DR1 created successfully during first test sync.
+- **PROJECT.md updated**: Local File Mode section rewritten to reflect actual implementation (downloads API + file picker, not File System Access API); manifest sketch corrected; settings schema corrected; status checklist updated; file structure expanded.
+- **lib/bookmarks.js**: `restoreBookmarks` and `restoreNode` moved here from popup.js so both popup and background service worker share the same implementation.
+- **manifest.json**: `host_permissions` changed to `<all_urls>` to support self-hosted server URLs.
+
+### 2026-09-17 — Sync fix: localDirty flag replaces broken timestamp upload check
+
+- **Root cause of "already up to date" bug**: `lastModified` is always set to the server's timestamp after a sync, so `localTime` can never be `> serverTime`. The upload branch was dead code — uploads never happened after the first sync regardless of local changes.
+- **Fix**: replaced the broken timestamp comparison with a `localDirty` boolean in `chrome.storage.local`.
+  - `onBookmarkChange` sets `localDirty = true` (in addition to scheduling the debounced sync).
+  - A successful upload sets `localDirty = false`.
+  - A successful download sets `localDirty = false`.
+  - `performSync` (background) and `syncNow` (popup) upload when `localDirty` is true; download when `serverTime > lastModified`; skip only when neither is true.
+  - No local machine clock involved in the upload decision — eliminates clock-skew as a failure mode.
+- **Spurious upload prevention**: `downloadFromServer` (popup) now sends `lockSync`/`unlockSync` messages to the background so the bookmark change events fired during `restoreBookmarks` don't set `localDirty = true` and trigger an unnecessary upload.
+- **Save Settings button removed** from the Sync tab — Sync Now already saves server settings as a side effect. A scoped Save button remains in the Settings tab for the sync interval.
+- **Alarm management**: Sync Now now creates/refreshes the `autoSync` alarm after every successful sync, ensuring the periodic background sync is always running once configured.
+
+### 2026-09-20 Handoff — core sync loop race conditions & root folder crash fixed, Web Viewer & Debug Mode added
+
+- **Root folder crash fix (`lib/bookmarks.js`)**: Fixed `restoreBookmarks` to match root folders by title or index position and fallback to valid root folder IDs (`root.children[1].id` or `root.children[0].id`). Strictly eliminated invalid `parentId: "0"` calls that caused Chrome API crashes mid-restore.
+- **`isBusy` event lockout fix (`background.js`)**: Removed post-restore delay so user edits made immediately after downloading a sync are captured instantly instead of being dropped.
+- **MV3 sleep resilience (`background.js`)**: Added `pendingSync` alarm backup (`delayInMinutes: 0.1` / 6s) in `onBookmarkChange`. If Chrome suspends the service worker mid-debounce (within 5s), the alarm wakes the worker up 6s later to push the upload.
+- **Server rate limit adjusted (`server/main.go`)**: Reduced PUT rate-limiting window from 30s to 5s per sync ID to support rapid test edits while preventing flood spam. Deployed updated binary to `DR1`.
+- **Plaintext Debug Mode (`popup.html`, `popup.js`, `crypto.js`)**: Added toggle under Settings -> Debug & Testing. When enabled, raw bookmark JSON is stored unencrypted so `/opt/bookmarksync/data/{id}.blob` can be inspected via `cat` on DR1.
+- **Web Bookmark Viewer (`www/index.html`)**: Deployed client-side Web Crypto bookmark tree viewer at `https://sync.satoshihost.com/`.
+- **Force Download / Upload buttons (`popup.html`, `popup.js`)**: Added explicit `⬇ Force Download` and `⬆ Force Upload` buttons underneath `Sync Now` in the extension popup.
+- **Extension Manager error badge fix (`background.js`)**: Switched network error logging in auto-sync from `console.error` to `console.warn` so transient network drops don't trigger red error badges in `chrome://extensions`.
 
 ### Test Credentials
 - Server: https://sync.satoshihost.com
@@ -169,8 +195,8 @@ Decision: Focus on server sync (the main feature). Users who want local backups 
 # Update server code:
 cd /home/andy/work/projects/browser-sync/server
 GOOS=linux GOARCH=amd64 go build -o bookmarksync .
-scp bookmarksync es6:/opt/bookmarksync/
-ssh es6 'systemctl restart bookmarksync'
+scp bookmarksync dr1:/opt/bookmarksync/
+ssh dr1 'systemctl restart bookmarksync'
 ```
 
 ### Extension
@@ -180,35 +206,17 @@ cd /home/andy/work/projects/browser-sync/extension
 
 # In browser:
 # 1. Go to chrome://extensions (or opera://extensions, etc.)
-# 2. Click reload button on BookmarkSync extension
+# 2. Click reload button on Full Browser Sync extension
 ```
 
 ---
 
 ## 📝 NEXT SESSION PLAN
 
-1. **Implement server sync in popup.js:**
-   - Wire up "Sync Now" button
-   - Create fullSync() function
-   - Handle first-time upload vs download choice
-
-2. **Implement background sync:**
-   - Complete performSync() in background.js
-   - Set up chrome.alarms properly
-   - Test automatic 30-minute sync
-
-3. **Test full sync cycle:**
-   - Opera: Configure, upload bookmarks
-   - Chrome: Use same ID/passphrase, download bookmarks
-   - Verify bookmarks match
-   - Test bidirectional sync
-
-4. **Polish and error handling:**
-   - Loading states
-   - Error messages
-   - Success confirmations
-
-**Estimated time:** 2-3 hours to complete core sync functionality
+1. **Polish UI feedback** — "Already up to date" after a manual sync feels wrong when the background already uploaded; show last auto-sync time in the popup status bar so the user understands what happened
+2. **Test in Firefox** — MV3 support landed in Firefox 109; check for any API differences
+3. **Test edge cases** — rate limiting (rapid bookmark adds), service worker sleep mid-debounce, mismatched clocks
+4. **Write the local-sync explainer page** — static page at sync.satoshihost.com explaining why automatic local-folder sync isn't possible from an extension, what does work, and what a future companion app would look like
 
 ---
 
@@ -217,7 +225,7 @@ cd /home/andy/work/projects/browser-sync/extension
 ### Important URLs
 - Live server: https://sync.satoshihost.com
 - GitHub: https://github.com/satoshihost/bookmarksync
-- Server SSH: `ssh es6` (configured in ~/.ssh/config)
+- Server SSH: `ssh dr1` (configured in ~/.ssh/config) — DR1 (198.23.202.164)
 
 ### Key Files
 - `server/main.go` - Server implementation
@@ -230,13 +238,13 @@ cd /home/andy/work/projects/browser-sync/extension
 ### Useful Commands
 ```bash
 # View server logs
-ssh es6 'journalctl -u bookmarksync -f'
+ssh dr1 'journalctl -u bookmarksync -f'
 
 # Check server status
 curl https://sync.satoshihost.com/status
 
 # Restart server
-ssh es6 'systemctl restart bookmarksync'
+ssh dr1 'systemctl restart bookmarksync'
 
 # Test API
 curl -X POST https://sync.satoshihost.com/sync
@@ -244,4 +252,4 @@ curl -X POST https://sync.satoshihost.com/sync
 
 ---
 
-**Status:** Server complete and live. Extension UI complete. Core sync logic is next!
+**Status:** Server complete and live on DR1. Extension complete and core sync loop fully verified working across browsers — automatic upload on bookmark change, automatic download, Plaintext Debug Mode, and Web Bookmark Viewer live at https://sync.satoshihost.com.

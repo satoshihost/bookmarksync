@@ -1,0 +1,26 @@
+Opened chromium, brave origin and chrome
+updated the plugin in all 3
+
+chromium had the TestFolder so I uploaded from there.
+downloaded for brave, TestFolder appeared
+downloaded for chrome, TestFolder appeared
+
+all 3 have the single bookmark inside the TestFolder
+
+===============================
+
+Deleted the TestFolder on chromium, waited 5 minutes.
+TestFolder has not appeared on the other two. Also the other two are offering me the choice to download or upload again, which should only happen the first time. 
+Checked chromium and it gives me the sync button as it should. 
+
+I tried a few times, it doesnt seem to have any pattern, can we disable the encryption during testing and make it so I can look at the server file to see if an added bookmark is actually on the server?
+
+Also that made me think of a future feature. Can we download the encrypted file, and display a page showing the suers bookmarks, provided they used their passphrase?
+
+===============================
+
+Or maybe better still, how about eliminating the versioning altogether, so e.g. if the filename is xxx we use xxx000 as the first filename, then we check the filename on next sync, whichever browser it is, if the finename is xxxooo then do nothing, if it is higher than 000 download it and server and browser both rename it to xxx001. I suppose if some random strnger happnes to download the file it will trigger an unneccessary download by the users browsers again, but how often would that happen?
+
+
+
+

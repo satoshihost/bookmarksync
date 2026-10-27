@@ -1,4 +1,4 @@
-# BookmarkSync
+# Full Browser Sync
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/satoshihost/bookmarksync)
 
@@ -12,7 +12,7 @@
 
 [xBrowserSync](https://www.xbrowsersync.org/) was an excellent bookmark sync solution that prioritized privacy and simplicity. Unfortunately, development ceased around 2020, and the extension was never updated to Manifest V3 (now required by Chrome). The project has been effectively abandoned since 2022.
 
-Rather than see this excellent idea fade away, BookmarkSync is a **clean-room rewrite** that preserves the core philosophy while modernizing the implementation:
+Rather than see this excellent idea fade away, Full Browser Sync is a **clean-room rewrite** that preserves the core philosophy while modernizing the implementation:
 
 - ✅ **Manifest V3** compatible (works in modern Chrome/Firefox)
 - ✅ **Modern stack** (Go server, contemporary JavaScript)
@@ -28,12 +28,18 @@ This project stands on the shoulders of xBrowserSync and aims to carry its spiri
 ### Two-Tier Architecture
 
 **Tier 1 — Local Only** (no server needed)
-- Export/import bookmarks as JSON files
-- Manual sync via USB, Syncthing, Dropbox, etc.
+- Export bookmarks to a versioned JSON backup using the browser's Save As dialog
+- Import a backup with the browser's file picker
+- Automatic safety backup created in local storage before every import or restore, with 1-click rollback UI
+- Import intentionally makes the destination browser match the backup, including deletions
+- Manual transfer via USB, Syncthing, Dropbox, etc.
 - Zero trust — nothing leaves your machine
 
 **Tier 2 — Sync Server** (optional)
-- Automatic sync across devices
+- Automatic sync across devices and browsers
+- **Cross-Browser Root Folder Mapping** (Chrome `Bookmarks bar` $\leftrightarrow$ Firefox `Bookmarks Toolbar` / `Bookmarks Menu`)
+- **Pre-Restore Validation & Empty-Tree Guard** (prevents corrupt or 0-bookmark payloads from wiping local bookmarks)
+- **Smart Bookmark Filtering** (automatically filters internal Firefox `place:` URLs to prevent browser API errors in Chromium)
 - End-to-end encrypted (AES-256-GCM)
 - Server stores only ciphertext
 - Self-hostable (single Go binary)
@@ -52,7 +58,7 @@ This project stands on the shoulders of xBrowserSync and aims to carry its spiri
 - **Storage:** Flat files (no database)
 - **Encryption:** AES-256-GCM with PBKDF2 key derivation (100k iterations)
 - **HTTPS:** Automatic Let's Encrypt via Caddy
-- **Extension:** Manifest V3, works in Chrome & Firefox
+- **Extension:** Manifest V3, works in Chrome (`extension/`) & Firefox (`extension-firefox/`)
 
 ---
 
@@ -60,7 +66,18 @@ This project stands on the shoulders of xBrowserSync and aims to carry its spiri
 
 ### Browser Extension
 
-*(Coming soon — extension is under development)*
+Load the `extension` directory as an unpacked extension from your browser's extensions page. The current local-backup mode works in Chromium-based browsers.
+
+#### Local backup and transfer
+
+1. In the source browser, open **Full Browser Sync → Local backup → Export bookmarks** and choose where to save the JSON file.
+2. Transfer that file to the other computer or browser profile, for example with Syncthing, USB, or Dropbox.
+3. In the destination browser, choose **Import bookmarks** and select the file.
+4. Confirm the replacement. The extension saves a dated `before-import-*.json` safety backup before changing anything.
+
+Import is a deliberate full replacement, not a merge: bookmarks present only in the destination are removed. Keep the safety backup if you may want to restore the previous state.
+
+Hosted server synchronisation is not implemented yet. The Sync tab currently saves configuration only.
 
 ### Self-Hosting the Server
 
@@ -166,8 +183,10 @@ bookmarksync/
 ├── server/          # Go backend
 │   ├── main.go
 │   └── go.mod
-├── extension/       # Browser extension (under development)
+├── extension/       # Browser extension (manual local backup/import implemented)
+├── tools/           # One-off maintenance utilities, including backup merger
 ├── PROJECT.md       # Full technical specification
+├── PROGRESS.md      # Current implementation status and handoff notes
 └── README.md
 ```
 
@@ -175,7 +194,7 @@ bookmarksync/
 
 ## Comparison to xBrowserSync
 
-| Feature | xBrowserSync | BookmarkSync |
+| Feature | xBrowserSync | Full Browser Sync |
 |---------|-------------|--------------|
 | Manifest Version | V2 (broken in Chrome) | V3 (modern) |
 | Server Language | Node.js + MongoDB | Go + flat files |
@@ -192,11 +211,12 @@ bookmarksync/
 - [x] Server implementation (Go)
 - [x] API specification
 - [x] Deployment setup (Caddy, systemd)
-- [ ] Browser extension (Manifest V3)
-  - [ ] Tier 1: Local file mode
+- [x] Browser extension shell (Manifest V3)
+  - [x] Tier 1: Manual local backup/import mode
+  - [x] Popup UI
+  - [x] Local import safety backup and recovery guidance
   - [ ] Tier 2: Server sync mode
-  - [ ] Popup UI
-  - [ ] Crypto module
+  - [x] Crypto module
 - [ ] Chrome Web Store submission
 - [ ] Firefox Add-ons submission
 - [ ] Easy deployment options

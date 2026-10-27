@@ -1,6 +1,6 @@
 https://claude.ai/share/48006fe3-b8ff-478a-9bcb-f001273c623f
 
-# BookmarkSync — Project Context
+# Full Browser Sync — Project Context
 
 > This document exists to give an AI coding assistant full context on the project's goals, architecture, decisions, and rationale. Read this before touching any code.
 
@@ -33,12 +33,25 @@ It died because:
 
 ### Tier 1 — Local Only (no server needed)
 
-The extension can export/import bookmarks as a JSON file on the local filesystem. This covers:
+The first local-only release is deliberately manual: the extension exports/imports bookmarks as a JSON file using the browser's standard Save As and file-picker dialogs. This covers:
 - Single-machine backup
 - Manual sync between machines (copy the file yourself via USB, Syncthing, Dropbox, etc.)
 - Zero trust required — nothing ever leaves the machine
 
 This is the simplest possible thing and covers a large fraction of use cases.
+
+#### Local import safety and behaviour
+
+- Import is a full replacement: the destination browser is made to match the selected backup, including deletions.
+- Before replacement, the extension always creates a dated `before-import-*.json` safety backup.
+- The user can choose a location for that safety backup (the default), or save it automatically to the browser's Downloads folder.
+- A browser extension cannot discover the folder selected in the import file picker, so it cannot silently save the safety backup beside the imported file.
+
+Future local-only automatic sync would require an optional native companion application to safely read and write a user-selected folder. It is explicitly out of scope for the first release.
+
+### Practical manual workflow (current)
+
+For the time being, a user may keep one chosen backup JSON file in a folder synchronised by a tool such as Syncthing. After making changes in one browser, export a new backup deliberately and import it into the other browsers. This remains a manual full-replacement workflow; the extension creates a safety backup before every import. A future optional native companion application can make a selected local folder automatic without weakening browser security.
 
 ### Tier 2 — Sync Server (optional)
 
@@ -95,6 +108,12 @@ The client stores a `lastModified` timestamp locally. On sync:
 
 This is sufficient for the primary use case (one person, a few machines). Race conditions are possible but rare and recoverable.
 
+Before automatic hosted sync ships, replace unconditional uploads with a server revision or ETag-style conditional write. This prevents two devices from silently overwriting each other's changes.
+
+## Future Import Review
+
+After the manual-replacement workflow is proven, add a pre-import change review. It should group bookmarks that would be added and destination-only bookmarks that would be removed, with bulk choices first. Individual selection is a later enhancement; the initial import action stays "make this browser match the file."
+
 ---
 
 ## Server Design
@@ -119,7 +138,7 @@ No database. No ORM. No migrations. A UUID is a 36-character string; 10,000 user
 
 ```
 POST   /sync              Create new sync ID
-                          Response: { "id": "uuid-v4", "lastModified": null }
+                          Response: { "id": "uuid-v4", "rev": 0 }
 
 GET    /sync/{id}         Download encrypted blob
                           Response: raw blob bytes (application/octet-stream)
@@ -129,13 +148,14 @@ GET    /sync/{id}         Download encrypted blob
 PUT    /sync/{id}         Upload encrypted blob
                           Body: raw blob bytes (application/octet-stream)
                           Max body: 2MB
-                          Response: { "lastModified": "RFC3339 timestamp" }
+                          Headers: X-Expected-Rev (optional optimistic concurrency check)
+                          Response: { "rev": N }
 
 DELETE /sync/{id}         Delete sync data
                           Response: 204 No Content
 
 GET    /sync/{id}/info    Lightweight check — no body download
-                          Response: { "lastModified": "RFC3339 timestamp" }
+                          Response: { "rev": N }
 
 GET    /status            Server health check
                           Response: { "status": "online", "version": "1.0.0", "maxSyncSize": 2097152 }
@@ -285,43 +305,54 @@ MV3 replaces persistent background pages with **service workers**. Key implicati
 ```
 extension/
   manifest.json         # MV3 manifest
-  background.js         # Service worker: handles alarms, sync logic
+  background.js         # Service worker: alarms, debounced change listeners, sync
   popup/
-    popup.html          # Settings UI: sync ID, passphrase, server URL, status
-    popup.js
+    popup.html          # UI: Local backup tab, Sync tab, Settings tab
+    popup.js            # All popup logic including server syncNow()
     popup.css
   lib/
     crypto.js           # AES-256-GCM encrypt/decrypt, PBKDF2 key derivation
-    bookmarks.js        # chrome.bookmarks read/write helpers
-    sync.js             # Core sync logic (upload/download/compare)
-    storage.js          # chrome.storage.local wrapper (settings, lastModified)
+    bookmarks.js        # chrome.bookmarks helpers: restoreBookmarks, countBookmarks
+    sync.js             # Server API client: uploadBlob, downloadBlob, getInfo
+    storage.js          # chrome.storage.local wrapper
   icons/
     icon-16.png
     icon-48.png
     icon-128.png
+
+server/
+  main.go               # Complete Go server (flat-file storage, all API endpoints)
+  go.mod
+
+tools/
+  merge_bookmark_exports.py  # One-off utility: merge and de-duplicate multiple exports
+
+www/                    # Static info page served at sync.satoshihost.com
+  favicons/
 ```
 
-### manifest.json sketch
+### manifest.json
 
 ```json
 {
   "manifest_version": 3,
-  "name": "BookmarkSync",
+  "name": "Full Browser Sync",
   "version": "1.0.0",
-  "description": "Simple, private bookmark sync",
-  "permissions": ["bookmarks", "storage", "alarms"],
-  "host_permissions": [],
+  "description": "Privacy-first bookmark synchronization. No account, end-to-end encrypted.",
+  "permissions": ["bookmarks", "storage", "alarms", "downloads"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_icon": { "48": "icons/icon-48.png" }
-  }
+    "default_icon": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
+  },
+  "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
 }
 ```
 
-Note: `host_permissions` is empty because the sync server URL is user-configurable and we request permission dynamically, or we can use `"<all_urls>"` — TBD.
+`"downloads"` is required for the Save As export and the automatic safety backup before import. `"<all_urls>"` covers user-configured self-hosted server URLs; this permission will need justification on Chrome Web Store submission.
 
 ### Crypto (crypto.js sketch)
 
@@ -369,11 +400,17 @@ Uses the **Web Crypto API** — available in both extension service workers and 
 
 ## Local File Mode
 
-The extension uses the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API) to read/write a JSON file. The user picks a file location once; the handle is persisted via `chrome.storage.local`.
+Export and import use the browser's own download and file-picker dialogs — no third-party APIs.
 
-The local file is **not encrypted** by default (it's on your own machine), but can optionally use the same encryption as the server mode.
+**Export** calls `chrome.downloads.download({ saveAs: true })`, which opens the browser's native Save As dialog. The file is a plain JSON backup (not encrypted — it stays on the user's machine).
 
-Local file format is identical to the server blob format (minus encryption), so migrating between modes is trivial.
+**Import** uses an `<input type="file">` picker. After the user selects a file, the extension validates it, saves a dated safety backup via `chrome.downloads`, then does a full-replacement restore.
+
+The local backup format is identical to the server blob format (minus the encryption layer), so switching between local and server mode is trivial.
+
+> **Why not the File System Access API?** That API could theoretically persist a chosen directory handle, but Chrome requires a fresh user gesture to re-grant access each browser session and the behaviour has changed repeatedly. The downloads/file-picker approach is stable, works in all Chromium browsers, and requires no extra permissions beyond `"downloads"`.
+
+Automatic local-folder sync (e.g. watching a Syncthing folder) requires a native companion application. It is explicitly out of scope for the extension alone.
 
 ---
 
@@ -381,14 +418,15 @@ Local file format is identical to the server blob format (minus encryption), so 
 
 ```json
 {
-  "mode": "local" | "server",
+  "syncMode": "Server" | "None",
   "syncId": "uuid-v4",
   "passphrase": "...",
   "serverUrl": "https://sync.yourdomain.com",
   "autoSync": true,
-  "syncIntervalMinutes": 30,
-  "lastModified": "RFC3339 timestamp",
-  "lastSyncStatus": "success" | "error" | "never"
+  "syncInterval": 30,
+  "lastModified": "RFC3339 timestamp — last successful server sync",
+  "lastSync": "ISO timestamp — last sync attempt",
+  "lastSyncError": "error message from last failed sync, if any"
 }
 ```
 
@@ -414,7 +452,7 @@ That's it. Caddy handles Let's Encrypt automatically.
 ### systemd service
 ```ini
 [Unit]
-Description=BookmarkSync API
+Description=Full Browser Sync API
 After=network.target
 
 [Service]
@@ -434,9 +472,9 @@ WantedBy=multi-user.target
 # On dev machine (cross-compile for Linux amd64)
 GOOS=linux GOARCH=amd64 go build -o bookmarksync .
 
-# On server
-scp bookmarksync user@server:/opt/bookmarksync/
-systemctl restart bookmarksync
+# Copy to server and restart (live server is DR1 — ssh dr1)
+scp bookmarksync dr1:/opt/bookmarksync/
+ssh dr1 'systemctl restart bookmarksync'
 ```
 
 Zero downtime deploys: the new binary is a single file copy + service restart (~100ms).
@@ -454,18 +492,22 @@ Zero downtime deploys: the new binary is a single file copy + service restart (~
 
 ## Project Status
 
-- [ ] Server: Go implementation
-- [ ] Extension: manifest + service worker scaffold
-- [ ] Extension: crypto module
-- [ ] Extension: bookmark read/write
-- [ ] Extension: sync logic
-- [ ] Extension: popup UI
-- [ ] Extension: local file mode
-- [ ] Testing: Chrome
+See `PROGRESS.md` for the live tracker. Summary:
+
+- [x] Server: Go implementation — deployed at sync.satoshihost.com
+- [x] Extension: Manifest V3 + service worker scaffold
+- [x] Extension: crypto module (AES-256-GCM + PBKDF2)
+- [x] Extension: bookmark read/write helpers
+- [x] Extension: local backup — export (Save As) and import (file picker + safety backup)
+- [x] Extension: popup UI (Local backup tab, Sync tab, Settings tab)
+- [x] Extension: server sync — upload, download, timestamp comparison, first-sync prompt
+- [x] Extension: auto-sync on bookmark change (debounced, 5 s) and on alarm (30 min)
+- [x] Tools: `tools/merge_bookmark_exports.py` — de-duplicate and merge multiple exports
+- [ ] Testing: Chrome end-to-end
 - [ ] Testing: Firefox
-- [ ] Server: deployment scripts
 - [ ] Chrome Web Store submission
 - [ ] Firefox Add-ons submission
+- [ ] Easy self-hosting: pre-built binaries, Docker image, .deb packages
 
 ---
 

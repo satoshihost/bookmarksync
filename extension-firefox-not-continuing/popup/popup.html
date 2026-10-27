@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Browser Sync</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Full Browser Sync</h1>
+            <p class="tagline">Privacy-first bookmark sync</p>
+        </header>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-indicator" id="statusIndicator">●</span>
+            <span id="statusText">Not configured</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab" data-tab="local">Local backup</button>
+            <button class="tab active" data-tab="server">Sync</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </div>
+
+        <div class="tab-content" id="local">
+            <h2>Local backup</h2>
+            <p class="help-text">Save a bookmark backup to a file, then import that file in another browser. Nothing is uploaded.</p>
+
+            <div class="local-actions">
+                <button class="btn btn-primary" id="exportBookmarksBtn">Export bookmarks</button>
+                <span class="help-text">Your browser will ask where to save the backup file.</span>
+            </div>
+
+            <div class="local-actions">
+                <button class="btn btn-secondary" id="importBookmarksBtn">Import bookmarks</button>
+                <label class="backup-choice">
+                    <input type="checkbox" id="chooseBackupLocation" checked>
+                    Choose where to save the safety backup
+                </label>
+                <span class="help-text">Import replaces your bookmarks. A backup of this browser is saved first.</span>
+            </div>
+
+            <div class="info-box">
+                To transfer bookmarks, export in one browser and import the saved file in the other.
+            </div>
+
+            <div class="local-actions" style="margin-top: 1.25rem; border-top: 1px dashed #ced4da; padding-top: 1rem;">
+                <button class="btn btn-secondary" id="rollbackSafetyBackupBtn" style="display:none; width: 100%; margin-bottom: 0.25rem;">⏪ Restore Auto Safety Backup</button>
+                <span class="help-text" id="rollbackHelpText">No auto safety backup available.</span>
+            </div>
+        </div>
+
+        <div class="tab-content active" id="server">
+            <h2>Bookmark Sync</h2>
+            <p class="help-text">Automatically sync your bookmarks across all browsers and devices. End-to-end encrypted.</p>
+
+            <div class="form-group">
+                <label for="serverUrl">Server URL</label>
+                <input type="text" id="serverUrl" placeholder="https://sync.satoshihost.com" value="https://sync.satoshihost.com">
+            </div>
+
+            <div class="form-group">
+                <label for="syncId">Sync ID</label>
+                <div class="input-with-btn">
+                    <input type="text" id="syncId" placeholder="Generate or enter your sync ID">
+                    <button class="btn btn-small" id="generateIdBtn">Generate</button>
+                </div>
+                <span class="help-text">Share this ID across your devices</span>
+            </div>
+
+            <div class="form-group">
+                <label for="passphrase">Passphrase</label>
+                <input type="password" id="passphrase" placeholder="Your encryption passphrase">
+                <span class="help-text">Never sent to server • Used for encryption only</span>
+            </div>
+
+            <!-- Shown on first use when server has data but this browser has never synced -->
+            <div id="firstSyncPanel" class="first-sync-panel" style="display:none">
+                <p class="first-sync-heading">Choose how to start syncing on this browser:</p>
+                <button class="btn btn-secondary" id="firstSyncDownloadBtn">
+                    Download from server
+                    <span class="first-sync-sub">Replaces bookmarks in this browser with the server copy</span>
+                </button>
+                <button class="btn btn-primary" id="firstSyncUploadBtn">
+                    Upload mine to server
+                    <span class="first-sync-sub">Overwrites the server copy with this browser's bookmarks</span>
+                </button>
+            </div>
+
+            <div class="button-group" id="syncNowGroup">
+                <button class="btn btn-primary" id="syncNowBtn">Sync Now</button>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="btn btn-small btn-secondary" id="forceDownloadBtn" style="flex: 1; font-size: 0.75rem; padding: 4px;">⬇ Force Download</button>
+                    <button class="btn btn-small btn-secondary" id="forceUploadBtn" style="flex: 1; font-size: 0.75rem; padding: 4px;">⬆ Force Upload</button>
+                </div>
+            </div>
+
+            <div class="info-box warning-box">
+                Keep your Sync ID and passphrase somewhere safe — they cannot be recovered, and without them you cannot sync to another browser.
+            </div>
+        </div>
+
+
+        <div class="tab-content" id="settings">
+            <h2>Settings</h2>
+            
+            <div class="form-group">
+                <label for="syncInterval">Sync Interval (minutes)</label>
+                <input type="number" id="syncInterval" min="1" max="1440" value="10">
+                <button class="btn btn-primary" id="saveIntervalBtn">Save</button>
+            </div>
+
+            <div class="stats">
+                <h3>Statistics</h3>
+                <div class="stat-item">
+                    <span>Total bookmarks:</span>
+                    <strong id="totalBookmarks">—</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Last sync:</span>
+                    <strong id="lastSync">Never</strong>
+                </div>
+                <div class="stat-item">
+                    <span>Sync mode:</span>
+                    <strong id="syncMode">None</strong>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                <label style="font-weight: 600;">Debug & Testing</label>
+                <label class="backup-choice" style="margin-top: 8px;">
+                    <input type="checkbox" id="plaintextMode">
+                    Plaintext Mode (Disable Encryption for Testing)
+                </label>
+                <span class="help-text">Stores raw bookmark JSON on server so files in /opt/bookmarksync/data/ can be inspected directly.</span>
+            </div>
+
+            <div class="danger-zone">
+                <h3>Danger Zone</h3>
+                <button class="btn btn-danger" id="resetBtn">Reset All Settings</button>
+            </div>
+        </div>
+
+        <footer>
+            <a href="https://github.com/satoshihost/bookmarksync" target="_blank">About</a> •
+            <a href="https://sync.satoshihost.com" target="_blank">Server Status</a>
+        </footer>
+    </div>
+
+    <script src="../config.local.js"></script>
+    <script src="../lib/crypto.js"></script>
+    <script src="../lib/sync.js"></script>
+    <script src="../lib/bookmarks.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -14,7 +14,7 @@ SOURCES = {
         name: (ROOT / extension / name).read_text()
         for name in ('background.js', 'lib/sync.js', 'lib/bookmarks.js', 'popup/popup.js', 'popup/popup.html')
     }
-    for extension in ('extension', 'extension-firefox')
+    for extension in ('extension',)
 }
 HARNESS = r'''
 const sources = SOURCES;

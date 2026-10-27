@@ -134,21 +134,12 @@ extension/
 
 ---
 
-## Separate Extensions Architecture — Chrome & Firefox
-
-Maintain separate, independent extension directories so development and changes to the Chrome or Firefox extensions can proceed independently without risk of breaking each other:
+## Extensions — Chrome only
 
 - **Chrome Extension**: [`extension/`](file:///home/andy/work/projects/browser-sync/extension) — Load in `chrome://extensions` (PRIMARY TARGET)
-- **Firefox Extension**: [`extension-firefox/`](file:///home/andy/work/projects/browser-sync/extension-firefox) — Abandoned for distribution/updates per user decision (Mozilla AMO submission rejected; Firefox local usage is dormant). Do not waste effort updating or building Firefox packages unless explicitly requested.
+- **Firefox**: discontinued. `extension-firefox-not-continuing/` contains only a note explaining why; the last Firefox source lives in git history. Do not update or build Firefox packages unless the user explicitly revives the port.
 
-### Cross-browser Compatibility & Mapping Rules:
-1. **Manifest V3 Differences**:
-   - Chrome MV3 uses `"background": { "service_worker": "background.js" }` in [`extension/manifest.json`](file:///home/andy/work/projects/browser-sync/extension/manifest.json).
-   - Firefox MV3 uses `"background": { "scripts": [...] }` in [`extension-firefox/manifest.json`](file:///home/andy/work/projects/browser-sync/extension-firefox/manifest.json).
-2. **Bookmark Root Folder Mapping**: Both extensions map top-level root bookmark folders dynamically when restoring:
-   - Chrome `"Bookmarks bar"` $\leftrightarrow$ Firefox `"Bookmarks Toolbar"`
-   - Chrome `"Other bookmarks"` $\leftrightarrow$ Firefox `"Other Bookmarks"`
-   - Firefox `"Bookmarks Menu"` $\leftrightarrow$ Fallback destination on target browser.
+If the Firefox port is ever revived, the relevant differences: Firefox MV3 uses `"background": { "scripts": [...] }` instead of a service worker, and root folders map as Chrome `"Bookmarks bar"` ↔ Firefox `"Bookmarks Toolbar"`, `"Other bookmarks"` ↔ `"Other Bookmarks"`, with Firefox `"Bookmarks Menu"` falling back to a sensible destination.
 
 ---
 

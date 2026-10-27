@@ -58,7 +58,7 @@ This project stands on the shoulders of xBrowserSync and aims to carry its spiri
 - **Storage:** Flat files (no database)
 - **Encryption:** AES-256-GCM with PBKDF2 key derivation (100k iterations)
 - **HTTPS:** Automatic Let's Encrypt via Caddy
-- **Extension:** Manifest V3, works in Chrome (`extension/`) & Firefox (`extension-firefox/`)
+- **Extension:** Manifest V3 for Chromium-based browsers (`extension/`)
 
 ---
 

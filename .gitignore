@@ -18,6 +18,14 @@ extension/package-lock.json
 *.swp
 *.swo
 *~
+*.code-workspace
+
+# Python
+__pycache__/
+*.pyc
+
+# Packaged extension archives
+*.zip
 
 # OS
 .DS_Store
@@ -29,4 +37,6 @@ Thumbs.db
 # Environment
 .env
 .env.local
+*.local.js
+config.local.js
 browser-sync-icon*.png
